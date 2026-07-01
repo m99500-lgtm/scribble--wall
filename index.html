@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>낙서벽 · ScribbleWall</title>
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Gaegu&family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0e0e12; --surface: #16161e; --surface2: #1a1a22;
+      --border: #222230; --border2: #2e2e3a;
+      --accent: #c8f060; --accent-dark: #0e0e12;
+      --text: #f0eee8; --text-sub: #6a6a80; --text-muted: #3a3a4a;
+      --red: #FF6B6B; --yellow: #FFD93D; --blue: #6BCFF6;
+      --seed: #90EE90; --leaf: #32CD32; --fruit: #FF8C00;
+      --moon: #FFD700;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Nanum Gothic', sans-serif; min-height: 100vh; }
+    .app { max-width: 480px; margin: 0 auto; min-height: 100vh; overflow-x: hidden; position: relative; }
+
+    /* ── MOON BANNER ── */
+    .moon-banner {
+      display: none; position: relative; margin: 10px 16px 0;
+      background: linear-gradient(135deg, #0a0a1a 0%, #1a1030 50%, #0d0d20 100%);
+      border: 1px solid #3a2a60; border-radius: 16px; overflow: hidden;
+      padding: 14px 16px; cursor: pointer;
+    }
+    .moon-banner.visible { display: block; }
+    .moon-banner-stars {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;
+    }
+    .moon-banner-content { position: relative; z-index: 1; }
+    .moon-banner-label {
+      font-size: 9px; letter-spacing: 2px; color: var(--moon); font-weight: 700;
+      margin-bottom: 6px; text-transform: uppercase;
+    }
+    .moon-banner-text {
+      font-family: 'Nanum Pen Script', cursive; font-size: 22px; color: #fff;
+      line-height: 1.3; margin-bottom: 4px;
+    }
+    .moon-banner-en {
+      font-family: 'Georgia', serif; font-style: italic; font-size: 12px; color: #aaa8cc;
+    }
+    .moon-emoji {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 40px; filter: drop-shadow(0 0 12px rgba(255,215,0,0.5));
+      animation: moonFloat 3s ease-in-out infinite;
+    }
+    @keyframes moonFloat { 0%,100%{transform:translateY(-50%) translateY(0)} 50%{transform:translateY(-50%) translateY(-6px)} }
+
+    /* ── HEADER ── */
+    .header { padding: 16px 20px 0; display: flex; align-items: flex-start; justify-content: space-between; }
+    .logo-kr { font-family: 'Nanum Pen Script', cursive; font-size: 26px; color: var(--text); }
+    .logo-kr span { color: var(--accent); }
+    .logo-en { font-size: 11px; color: #555; margin-top: 2px; }
+    .logo-en span { color: var(--accent); }
+    .tab-row { display: flex; gap: 6px; padding-top: 4px; flex-wrap: wrap; justify-content: flex-end; }
+    .tab { background: none; border: 1px solid #2a2a32; color: #777; padding: 5px 10px; border-radius: 20px; font-size: 10px; cursor: pointer; font-family: 'Nanum Gothic', sans-serif; transition: all 0.2s; line-height: 1.5; text-align: center; }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-dark); font-weight: 700; }
+    .tab.seed-tab { border-color: var(--seed); color: var(--seed); }
+    .tab.seed-tab.active { background: var(--seed); color: #000; }
+    .tab.leaf-tab { border-color: var(--leaf); color: var(--leaf); }
+    .tab.leaf-tab.active { background: var(--leaf); color: #000; }
+    .tab.fruit-tab { border-color: var(--fruit); color: var(--fruit); }
+    .tab.fruit-tab.active { background: var(--fruit); color: #fff; }
+
+    /* ── USER BADGE ── */
+    .user-badge { display: flex; align-items: center; gap: 6px; padding: 8px 20px 0; font-size: 11px; color: #555; }
+    .user-dot { width: 7px; height: 7px; border-radius: 50%; background: #333; transition: background 0.3s; }
+    .user-dot.online { background: var(--accent); }
+    .badge-icon { font-size: 14px; margin-left: 4px; }
+
+    /* ── TIER GATE ── */
+    .tier-gate {
+      margin: 16px; padding: 20px; background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 16px; text-align: center;
+    }
+    .tier-gate-icon { font-size: 36px; margin-bottom: 8px; }
+    .tier-gate-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .tier-gate-desc { font-size: 12px; color: #666; line-height: 1.6; }
+
+    /* ── INPUT ── */
+    .input-area { padding: 12px 20px 10px; position: sticky; top: 0; z-index: 10; background: linear-gradient(to bottom, var(--bg) 85%, transparent); }
+    .input-box { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1.5px solid var(--border2); border-radius: 14px; padding: 10px 14px; transition: border-color 0.2s; }
+    .input-box:focus-within { border-color: var(--accent); }
+    .input-box input { flex: 1; background: none; border: none; outline: none; color: var(--text); font-family: 'Nanum Pen Script', cursive; font-size: 19px; caret-color: var(--accent); }
+    .input-box input::placeholder { color: #444; }
+    .char-count { font-size: 11px; color: #444; min-width: 34px; text-align: right; }
+    .char-count.warn { color: var(--red); }
+    .input-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; }
+    .input-hint { font-size: 11px; color: #555; }
+    .throw-btn { background: var(--accent); border: none; border-radius: 10px; padding: 7px 16px; color: var(--accent-dark); font-weight: 700; font-size: 12px; cursor: pointer; font-family: 'Nanum Gothic', sans-serif; transition: opacity 0.15s, transform 0.1s; }
+    .throw-btn:active { transform: scale(0.95); }
+    .throw-btn:disabled { opacity: 0.3; cursor: default; }
+
+    /* ── WALL ── */
+    .wall { padding: 4px 16px 100px; display: flex; flex-direction: column; gap: 10px; }
+    .note { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px 10px; position: relative; overflow: hidden; transition: opacity 0.6s; }
+    .note.pop { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes popIn { from { transform: scale(0.85) translateY(-8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .note-tier-badge { position: absolute; top: 10px; right: 10px; font-size: 16px; }
+    .note-kr { line-height: 1.4; word-break: keep-all; color: var(--text); }
+    .note-sm .note-kr { font-size: 16px; } .note-md .note-kr { font-size: 18px; } .note-lg .note-kr { font-size: 20px; } .note-xl .note-kr { font-size: 22px; font-weight: 700; }
+    .divider { width: 22px; height: 1px; background: #252532; margin: 7px 0; }
+    .note-en { font-family: 'Georgia', serif; font-style: italic; color: var(--text-sub); line-height: 1.4; }
+    .note-sm .note-en { font-size: 12px; } .note-md .note-en { font-size: 12px; } .note-lg .note-en { font-size: 13px; } .note-xl .note-en { font-size: 14px; }
+    .translating { font-family: 'Georgia', serif; font-style: italic; font-size: 12px; color: #444; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:0.25} 50%{opacity:0.75} }
+    .note-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+    .note-time { font-size: 10px; color: var(--text-muted); }
+    .reactions { display: flex; gap: 5px; }
+    .react-btn { display: flex; align-items: center; gap: 3px; background: #1e1e28; border: 1px solid #2a2a36; border-radius: 20px; padding: 3px 9px; cursor: pointer; color: #999; font-size: 12px; font-family: 'Nanum Gothic', sans-serif; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+    .react-btn:active { transform: scale(0.88); }
+    .react-btn.on-k { border-color: var(--yellow); color: var(--yellow); }
+    .react-btn.on-u { border-color: var(--blue); color: var(--blue); }
+    .react-btn.on-e { border-color: var(--red); color: var(--red); }
+    .hot { display: inline-block; background: var(--red); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; margin-left: 7px; vertical-align: middle; }
+    .life-bar { position: absolute; bottom: 0; left: 0; height: 2px; background: linear-gradient(to right, var(--accent), var(--blue)); transition: width 1s linear; }
+
+    /* Tier note borders */
+    .note.tier-leaf { border-color: #1e4020; }
+    .note.tier-fruit { border-color: #4a2800; background: linear-gradient(180deg, #1a1208 0%, #16161e 100%); }
+
+    /* ── TODAY BEST ── */
+    .today-wrap { padding: 12px 20px 100px; }
+    .today-label { font-size: 10px; color: #555; letter-spacing: 1.2px; margin-bottom: 14px; }
+    .best-card { border-left: 3px solid var(--accent); padding: 12px 16px; margin-bottom: 12px; background: #13131a; border-radius: 0 12px 12px 0; }
+    .best-rank { font-size: 11px; color: var(--accent); font-weight: 700; margin-bottom: 5px; }
+    .best-kr { font-family: 'Nanum Pen Script', cursive; font-size: 20px; color: var(--text); margin-bottom: 3px; }
+    .best-en { font-family: 'Georgia', serif; font-style: italic; font-size: 13px; color: #556; margin-bottom: 8px; }
+    .best-stats { font-size: 11px; color: #555; }
+
+    /* ── BADGE PAGE ── */
+    .badge-page { padding: 16px 16px 100px; }
+    .badge-section { margin-bottom: 24px; }
+    .badge-section-title { font-size: 11px; color: #555; letter-spacing: 1.2px; margin-bottom: 12px; }
+    .badge-cards { display: flex; gap: 10px; }
+    .badge-card {
+      flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px 10px; text-align: center; position: relative; overflow: hidden;
+    }
+    .badge-card.earned { border-color: #3a3a20; }
+    .badge-card.earned.seed { border-color: #2a4a2a; background: linear-gradient(180deg, #0e1e0e 0%, #16161e 100%); }
+    .badge-card.earned.leaf { border-color: #1a4a1a; background: linear-gradient(180deg, #0a1a0a 0%, #16161e 100%); }
+    .badge-card.earned.fruit { border-color: #4a2a00; background: linear-gradient(180deg, #1a0e00 0%, #16161e 100%); }
+    .badge-svg { width: 60px; height: 60px; margin: 0 auto 8px; display: block; }
+    .badge-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .badge-name.seed { color: var(--seed); }
+    .badge-name.leaf { color: var(--leaf); }
+    .badge-name.fruit { color: var(--fruit); }
+    .badge-desc { font-size: 10px; color: #555; line-height: 1.5; }
+    .badge-req { font-size: 10px; color: #444; margin-top: 6px; }
+    .badge-locked { position: absolute; inset: 0; background: rgba(0,0,0,0.5); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .my-stats { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    .my-stats-title { font-size: 11px; color: #555; letter-spacing: 1.2px; margin-bottom: 12px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { font-size: 12px; color: #888; }
+    .stat-value { font-size: 13px; font-weight: 700; color: var(--accent); }
+
+    /* ── FOOTER COUNTER ── */
+    .footer-bar {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px; background: rgba(14,14,18,0.95);
+      backdrop-filter: blur(10px); border-top: 1px solid var(--border);
+      padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+      z-index: 50;
+    }
+    .footer-nav { display: flex; gap: 4px; }
+    .footer-nav-btn {
+      background: none; border: none; color: #555; font-size: 10px; padding: 4px 8px;
+      cursor: pointer; border-radius: 8px; font-family: 'Nanum Gothic', sans-serif;
+      transition: all 0.2s;
+    }
+    .footer-nav-btn.active { color: var(--accent); background: rgba(200,240,96,0.1); }
+    .visit-counter {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: #555;
+    }
+    .visit-counter-num { font-size: 13px; font-weight: 700; color: var(--accent); }
+    .visit-counter-icon { font-size: 14px; }
+
+    /* ── TOAST ── */
+    #toast { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); background: #1e1e28; border: 1px solid #333; color: var(--text); padding: 10px 20px; border-radius: 24px; font-size: 13px; z-index: 200; white-space: nowrap; animation: fadeUp 0.3s ease; }
+    @keyframes fadeUp { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    .empty { text-align: center; padding: 60px 0; font-family: 'Nanum Pen Script', cursive; font-size: 20px; color: #333; line-height: 2.2; }
+    .empty small { font-family: 'Georgia', serif; font-style: italic; font-size: 13px; color: #444; display: block; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- MOON BANNER (주간 핫 낙서) -->
+  <div class="moon-banner" id="moon-banner" onclick="scrollToNote(moonNoteId)">
+    <canvas class="moon-banner-stars" id="star-canvas"></canvas>
+    <div class="moon-banner-content">
+      <div class="moon-banner-label">🚀 이번 주 최고 낙서 · WEEK'S BEST</div>
+      <div class="moon-banner-text" id="moon-text">—</div>
+      <div class="moon-banner-en" id="moon-en"></div>
+    </div>
+    <div class="moon-emoji">🌕</div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="logo-kr">낙서<span>벽</span></div>
+      <div class="logo-en">Scribble<span>Wall</span> · 한 줄 · One line</div>
+    </div>
+    <div class="tab-row">
+      <button class="tab active" id="tab-wall"  onclick="switchTab('wall')">벽<br/>Wall</button>
+      <button class="tab" id="tab-today" onclick="switchTab('today')">오늘의 한 줄<br/>Today's Best</button>
+      <button class="tab seed-tab" id="tab-seed"  onclick="switchTab('seed')">🌱<br/>씨앗</button>
+      <button class="tab leaf-tab" id="tab-leaf"  onclick="switchTab('leaf')">🍃<br/>잎사귀</button>
+      <button class="tab fruit-tab" id="tab-fruit" onclick="switchTab('fruit')">🍎<br/>열매</button>
+      <button class="tab" id="tab-badge" onclick="switchTab('badge')">🏅<br/>뱃지</button>
+    </div>
+  </div>
+
+  <!-- USER BADGE -->
+  <div class="user-badge">
+    <div class="user-dot" id="user-dot"></div>
+    <span id="user-label">연결 중... · Connecting...</span>
+    <span class="badge-icon" id="user-badge-icon"></span>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-area" id="input-area">
+    <div class="input-box">
+      <input type="text" id="note-input" maxlength="28"
+        placeholder="한 줄만 던져봐... / Just one line..."
+        oninput="onInput()"
+        onkeydown="if(event.key==='Enter') throwNote()" />
+      <span class="char-count" id="char-count">0/28</span>
+    </div>
+    <div class="input-footer">
+      <span class="input-hint" id="input-hint">익명 · anonymous</span>
+      <button class="throw-btn" id="throw-btn" onclick="throwNote()" disabled>
+        던지기 · Throw 🪄
+      </button>
+    </div>
+  </div>
+
+  <!-- VIEWS -->
+  <div class="wall" id="view-wall"></div>
+  <div class="today-wrap" id="view-today" style="display:none"></div>
+  <div class="wall" id="view-seed" style="display:none"></div>
+  <div class="wall" id="view-leaf" style="display:none"></div>
+  <div class="wall" id="view-fruit" style="display:none"></div>
+  <div class="badge-page" id="view-badge" style="display:none"></div>
+
+  <div id="toast"></div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <div class="footer-nav">
+      <button class="footer-nav-btn active" id="fnav-wall" onclick="switchTab('wall')">벽</button>
+      <button class="footer-nav-btn" id="fnav-today" onclick="switchTab('today')">Best</button>
+      <button class="footer-nav-btn" id="fnav-badge" onclick="switchTab('badge')">뱃지</button>
+    </div>
+    <div class="visit-counter">
+      <span class="visit-counter-icon">👁️</span>
+      <span class="visit-counter-num" id="visit-count">0</span>
+      <span>누적 방문</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+var currentUser = null;
+var myReacted   = {};
+var currentTab  = 'wall';
+var moonNoteId  = null;
+
+// localStorage 기반 영속 저장
+function loadNotes() {
+  try {
+    var saved = localStorage.getItem('sw_notes');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return null;
+}
+function saveNotes() {
+  try { localStorage.setItem('sw_notes', JSON.stringify(notes)); } catch(e) {}
+}
+function loadVisits() {
+  try { return parseInt(localStorage.getItem('sw_visits') || '0'); } catch(e) { return 0; }
+}
+function incVisit() {
+  try {
+    var v = loadVisits() + 1;
+    localStorage.setItem('sw_visits', v);
+    return v;
+  } catch(e) { return 0; }
+}
+function loadMyReacted() {
+  try {
+    var r = localStorage.getItem('sw_reacted');
+    if (r) myReacted = JSON.parse(r);
+  } catch(e) {}
+}
+function saveMyReacted() {
+  try { localStorage.setItem('sw_reacted', JSON.stringify(myReacted)); } catch(e) {}
+}
+function loadUserStats() {
+  try {
+    var s = localStorage.getItem('sw_stats');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return { posts: 0, reactions: 0, weeklyBests: 0 };
+}
+function saveUserStats(s) {
+  try { localStorage.setItem('sw_stats', JSON.stringify(s)); } catch(e) {}
+}
+
+var SAMPLE_NOTES = [
+  { id:"s1", text:"오늘따라 하늘이 유난히 파랗다",     en:"The sky looks unusually blue today",            reactions:{k:2,u:5,e:1}, ts:Date.now()-1000*60*40,  font:0, tier:0, permanent:false },
+  { id:"s2", text:"점심 뭐 먹지",                       en:"What should I have for lunch",                 reactions:{k:8,u:0,e:3}, ts:Date.now()-1000*60*90,  font:1, tier:0, permanent:false },
+  { id:"s3", text:"퇴근하고 싶다",                      en:"I just wanna go home",                         reactions:{k:12,u:6,e:2},ts:Date.now()-1000*60*20,  font:2, tier:1, permanent:false },
+  { id:"s4", text:"비 오는 날엔 왜 이렇게 졸리지",      en:"Why am I always sleepy when it rains",         reactions:{k:3,u:9,e:0}, ts:Date.now()-1000*60*130, font:0, tier:0, permanent:false },
+  { id:"s5", text:"나만 힘든 거 아니지?",               en:"It's not just me struggling, right?",          reactions:{k:1,u:14,e:4},ts:Date.now()-1000*60*15,  font:1, tier:1, permanent:false },
+  { id:"s6", text:"커피 네 잔째인데 눈이 안 떠진다",    en:"Fourth coffee, still can't keep my eyes open", reactions:{k:7,u:2,e:5}, ts:Date.now()-1000*60*200, font:2, tier:0, permanent:false },
+  { id:"s7", text:"주말이 왜 이렇게 빨리 끝나",         en:"Why does the weekend fly by so fast",           reactions:{k:4,u:11,e:1},ts:Date.now()-1000*60*60,  font:0, tier:1, permanent:false },
+  { id:"s8", text:"그냥 잘 살고 싶다",                  en:"I just want to live well",                     reactions:{k:0,u:18,e:6},ts:Date.now()-1000*60*5,   font:1, tier:2, permanent:true  },
+];
+
+var notes = loadNotes() || SAMPLE_NOTES.map(function(n){ return Object.assign({}, n); });
+
+// 티어 기준: 0=씨앗, 1=잎사귀, 2=열매
+function calcTier(r) {
+  var t = r.k + r.u + r.e;
+  if (t >= 15) return 2;
+  if (t >= 6)  return 1;
+  return 0;
+}
+
+// 티어 자동 업데이트 + 24h 씨앗 삭제
+function pruneAndUpgrade() {
+  var now = Date.now();
+  notes = notes.filter(function(n) {
+    var tier = calcTier(n.reactions);
+    // 씨앗이고 반응 0이고 24h 지났으면 삭제 (영구저장 제외)
+    if (!n.permanent && tier === 0) {
+      var t = n.reactions.k + n.reactions.u + n.reactions.e;
+      var age = (now - n.ts) / (1000 * 60 * 60);
+      if (t === 0 && age >= 24) return false;
+    }
+    // 티어 업그레이드
+    n.tier = tier;
+    // 열매 등급은 영구 저장
+    if (tier === 2) n.permanent = true;
+    return true;
+  });
+  saveNotes();
+}
+
+// 유저 뱃지 계산
+function getUserBadge() {
+  var stats = loadUserStats();
+  if (stats.posts >= 10 && stats.reactions >= 30) return 2; // 열매
+  if (stats.posts >= 3  && stats.reactions >= 5)  return 1; // 잎사귀
+  if (stats.posts >= 1)                            return 0; // 씨앗
+  return -1; // 없음
+}
+
+var BADGE_EMOJIS = ['🌱', '🍃', '🍎'];
+var BADGE_NAMES  = ['씨앗', '잎사귀', '열매'];
+var BADGE_COLORS = ['seed', 'leaf', 'fruit'];
+
+// ══════════════════════════════════════════
+// BADGE SVG 생성
+// ══════════════════════════════════════════
+function seedSVG(earned) {
+  var op = earned ? 1 : 0.3;
+  return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+op+'">'
+    +'<circle cx="30" cy="30" r="28" fill="#0e1e0e" stroke="#90EE90" stroke-width="1.5"/>'
+    +'<ellipse cx="30" cy="36" rx="8" ry="10" fill="#2d5a2d"/>'
+    +'<path d="M30 26 Q38 18 44 22 Q40 32 30 30 Q20 32 16 22 Q22 18 30 26Z" fill="#90EE90"/>'
+    +'<line x1="30" y1="30" x2="30" y2="44" stroke="#5a9a5a" stroke-width="1.5"/>'
+    +'<circle cx="30" cy="25" r="3" fill="#c8f060" opacity="0.8"/>'
+    +'</svg>';
+}
+function leafSVG(earned) {
+  var op = earned ? 1 : 0.3;
+  return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+op+'">'
+    +'<circle cx="30" cy="30" r="28" fill="#0a1a0a" stroke="#32CD32" stroke-width="1.5"/>'
+    +'<path d="M30 44 Q14 32 18 18 Q26 12 38 16 Q46 28 30 44Z" fill="#228B22"/>'
+    +'<path d="M30 44 Q32 34 36 26" stroke="#90EE90" stroke-width="1.2" fill="none"/>'
+    +'<path d="M26 30 Q28 28 32 26" stroke="#90EE90" stroke-width="0.8" fill="none"/>'
+    +'<path d="M24 36 Q26 33 30 32" stroke="#90EE90" stroke-width="0.8" fill="none"/>'
+    +'<circle cx="38" cy="16" r="2.5" fill="#c8f060" opacity="0.9"/>'
+    +'</svg>';
+}
+function fruitSVG(earned) {
+  var op = earned ? 1 : 0.3;
+  return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+op+'">'
+    +'<circle cx="30" cy="30" r="28" fill="#1a0e00" stroke="#FF8C00" stroke-width="1.5"/>'
+    +'<circle cx="30" cy="35" r="14" fill="#cc2200"/>'
+    +'<ellipse cx="30" cy="35" rx="14" ry="14" fill="url(#appleGrad)"/>'
+    +'<defs><radialGradient id="appleGrad" cx="40%" cy="35%"><stop offset="0%" stop-color="#ff6644"/><stop offset="100%" stop-color="#cc1100"/></radialGradient></defs>'
+    +'<path d="M30 21 Q32 14 38 13" stroke="#228B22" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+    +'<path d="M30 21 Q34 17 36 19" fill="#228B22"/>'
+    +'<ellipse cx="24" cy="30" rx="3" ry="5" fill="rgba(255,255,255,0.15)" transform="rotate(-20,24,30)"/>'
+    +'<circle cx="44" cy="14" r="2" fill="#FFD700" opacity="0.8"/>'
+    +'</svg>';
+}
+
+// ══════════════════════════════════════════
+// STAR CANVAS
+// ══════════════════════════════════════════
+function initStars() {
+  var canvas = document.getElementById('star-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  for (var i = 0; i < 40; i++) {
+    var x = Math.random() * canvas.width;
+    var y = Math.random() * canvas.height;
+    var r = Math.random() * 1.2;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.6 + 0.2) + ')';
+    ctx.fill();
+  }
+}
+
+// ══════════════════════════════════════════
+// VISIT COUNTER
+// ══════════════════════════════════════════
+function updateVisitDisplay(v) {
+  document.getElementById('visit-count').textContent = v.toLocaleString();
+}
+
+// ══════════════════════════════════════════
+// MOON BANNER
+// ══════════════════════════════════════════
+function updateMoonBanner() {
+  // 주간 최핫: 이번 주 월요일 00시 이후 게시물 중 반응 최고
+  var weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  var weekNotes = notes.filter(function(n) { return n.ts >= weekAgo; });
+  if (!weekNotes.length) weekNotes = notes; // fallback
+  var best = weekNotes.reduce(function(a, b) {
+    var ta = a.reactions.k + a.reactions.u + a.reactions.e;
+    var tb = b.reactions.k + b.reactions.u + b.reactions.e;
+    return tb > ta ? b : a;
+  });
+  var tot = best.reactions.k + best.reactions.u + best.reactions.e;
+  if (tot < 3) { document.getElementById('moon-banner').classList.remove('visible'); return; }
+  moonNoteId = best.id;
+  document.getElementById('moon-text').textContent = best.text;
+  document.getElementById('moon-en').textContent = best.en || '';
+  document.getElementById('moon-banner').classList.add('visible');
+  initStars();
+}
+
+function scrollToNote(id) {
+  switchTab('wall');
+  setTimeout(function() {
+    var el = document.querySelector('[data-note-id="'+id+'"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+// ══════════════════════════════════════════
+// PI AUTH
+// ══════════════════════════════════════════
+var PiService = (function() {
+  var _user = null;
+  function onIncompletePaymentFound(payment) { console.warn("Incomplete payment:", payment); }
+  function login() {
+    Pi.init({ version: "2.0", sandbox: false });
+    return Pi.authenticate(["username"], onIncompletePaymentFound)
+      .then(function(auth) { _user = auth.user; return { success: true, user: auth.user }; })
+      .catch(function(e)   { return { success: false, error: e }; });
+  }
+  return { login: login, getUser: function(){ return _user; } };
+})();
+
+// ══════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════
+var FONTS = ["'Nanum Pen Script', cursive","'Gaegu', cursive","'Nanum Gothic', sans-serif"];
+var LABELS = { k:"ㅋ", u:"ㅠ", e:"!" };
+
+function uid() { return Math.random().toString(36).substr(2,9); }
+function timeAgo(ts) {
+  var d=Date.now()-ts, m=Math.floor(d/60000);
+  if(m<1) return "방금 · just now";
+  if(m<60) return m+"분 전 · "+m+"m ago";
+  var h=Math.floor(m/60);
+  if(h<24) return h+"시간 전 · "+h+"h ago";
+  return Math.floor(h/24)+"일 전";
+}
+function getOpacity(n) {
+  if (n.permanent) return 1;
+  var hrs=(Date.now()-n.ts)/(1000*60*60);
+  var r=n.reactions;
+  var boost=Math.min((r.k+r.u+r.e)*4,30);
+  var eff=Math.max(0,hrs-boost);
+  if(eff<12) return 1;
+  if(eff<36) return 1-((eff-12)/24)*0.6;
+  return 0.2;
+}
+function getSizeClass(r) {
+  var t=r.k+r.u+r.e;
+  if(t>=10) return "note-xl";
+  if(t>=5)  return "note-lg";
+  if(t>=2)  return "note-md";
+  return "note-sm";
+}
+function showToast(msg) {
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){ el.style.display='none'; },2500);
+}
+
+// ══════════════════════════════════════════
+// INPUT
+// ══════════════════════════════════════════
+function onInput() {
+  var val=document.getElementById('note-input').value;
+  var cc=document.getElementById('char-count');
+  cc.textContent=val.length+'/28';
+  cc.className='char-count'+(val.length>23?' warn':'');
+  document.getElementById('throw-btn').disabled=!val.trim();
+}
+
+// ══════════════════════════════════════════
+// THROW
+// ══════════════════════════════════════════
+function throwNote() {
+  var input=document.getElementById('note-input');
+  var text=input.value.trim();
+  if(!text) return;
+
+  var note={ id:uid(), text:text, en:null, reactions:{k:0,u:0,e:0}, ts:Date.now(), font:Math.floor(Math.random()*3), isNew:true, translating:true, tier:0, permanent:false };
+  notes.unshift(note);
+  input.value=''; onInput();
+
+  // 유저 통계 업데이트
+  var stats = loadUserStats();
+  stats.posts++;
+  saveUserStats(stats);
+  updateBadgeIcon();
+
+  saveNotes();
+  renderCurrent();
+  showToast("번역 중... 🪄");
+
+  fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:80,
+      messages:[{role:"user",content:'Translate this Korean one-liner into casual English. Under 10 words. Return ONLY the translation.\n\n"'+text+'"'}]
+    })
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var en=(data.content&&data.content[0])?data.content[0].text.trim():"...";
+    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:en,translating:false,isNew:false}):n; });
+    saveNotes(); renderCurrent(); showToast("벽에 던졌어요 🪄");
+  })
+  .catch(function(){
+    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:"...",translating:false,isNew:false}):n; });
+    saveNotes(); renderCurrent(); showToast("벽에 던졌어요 🪄");
+  });
+}
+
+// ══════════════════════════════════════════
+// REACT
+// ══════════════════════════════════════════
+function react(noteId, key) {
+  var rkey=noteId+"_"+key;
+  var on=myReacted[rkey];
+  myReacted[rkey]=!on;
+  saveMyReacted();
+
+  notes=notes.map(function(n){
+    if(n.id!==noteId) return n;
+    var r=Object.assign({},n.reactions);
+    r[key]=Math.max(0,r[key]+(on?-1:1));
+    var updated = Object.assign({},n,{reactions:r});
+    updated.tier = calcTier(r);
+    if (updated.tier === 2) updated.permanent = true;
+    return updated;
+  });
+
+  if (!on) {
+    var stats = loadUserStats();
+    stats.reactions++;
+    saveUserStats(stats);
+  }
+
+  saveNotes(); pruneAndUpgrade(); updateMoonBanner(); renderCurrent();
+  if(!on) showToast(LABELS[key]+" 반응했어요!");
+}
+
+// ══════════════════════════════════════════
+// RENDER NOTE CARD
+// ══════════════════════════════════════════
+function noteCard(note) {
+  var op=getOpacity(note);
+  var sc=getSizeClass(note.reactions);
+  var tot=note.reactions.k+note.reactions.u+note.reactions.e;
+  var life=Math.round(op*100);
+  var hot=tot>=8?'<span class="hot">HOT</span>':'';
+  var enHtml=note.translating?'<div class="translating">translating...</div>':'<div class="note-en">'+(note.en||'')+'</div>';
+  var btns=['k','u','e'].map(function(k){
+    var on=myReacted[note.id+"_"+k]?'on-'+k:'';
+    return '<button class="react-btn '+on+'" onclick="react(\''+note.id+'\',\''+k+'\')">'+
+      '<span>'+LABELS[k]+'</span><span style="font-size:11px">'+note.reactions[k]+'</span></button>';
+  }).join('');
+  var tierBadge = note.tier > 0 ? '<div class="note-tier-badge">'+BADGE_EMOJIS[note.tier]+'</div>' : '';
+  var tierClass = note.tier === 2 ? ' tier-fruit' : note.tier === 1 ? ' tier-leaf' : '';
+  var permanentMark = note.permanent ? ' 🔒' : '';
+  return '<div class="note '+sc+(note.isNew?' pop':'')+tierClass+'" data-note-id="'+note.id+'" style="opacity:'+op+'">'+
+    tierBadge+
+    '<div class="note-kr" style="font-family:'+FONTS[note.font]+'">'+note.text+hot+permanentMark+'</div>'+
+    '<div class="divider"></div>'+enHtml+
+    '<div class="note-meta"><span class="note-time">'+timeAgo(note.ts)+'</span>'+
+    '<div class="reactions">'+btns+'</div></div>'+
+    '<div class="life-bar" style="width:'+life+'%"></div></div>';
+}
+
+// ══════════════════════════════════════════
+// RENDER WALL
+// ══════════════════════════════════════════
+function renderWall(elId, filterFn) {
+  var sorted = notes.filter(filterFn || function(){ return true; }).slice().sort(function(a,b){
+    return (b.reactions.k+b.reactions.u+b.reactions.e)-(a.reactions.k+a.reactions.u+a.reactions.e)||b.ts-a.ts;
+  });
+  var el=document.getElementById(elId);
+  if(!sorted.length){ el.innerHTML='<div class="empty">아직 아무도 없어요<small>Be the first.</small></div>'; return; }
+  el.innerHTML=sorted.map(noteCard).join('');
+}
+
+function renderToday() {
+  var best=notes.slice().sort(function(a,b){
+    return (b.reactions.k+b.reactions.u+b.reactions.e)-(a.reactions.k+a.reactions.u+a.reactions.e);
+  }).slice(0,3);
+  var medals=["🥇","🥈","🥉"];
+  document.getElementById('view-today').innerHTML=
+    '<div class="today-label">TODAY\'S MOST LOVED · 오늘 가장 많은 반응</div>'+
+    best.map(function(n,i){
+      var t=n.reactions.k+n.reactions.u+n.reactions.e;
+      return '<div class="best-card"><div class="best-rank">'+medals[i]+' #'+(i+1)+'</div>'+
+        '<div class="best-kr" style="font-family:'+FONTS[n.font]+'">'+n.text+'</div>'+
+        '<div class="best-en">'+(n.en||'...')+'</div>'+
+        '<div class="best-stats">ㅋ '+n.reactions.k+' · ㅠ '+n.reactions.u+' · ! '+n.reactions.e+' · 총 '+t+'</div></div>';
+    }).join('');
+}
+
+// ══════════════════════════════════════════
+// BADGE PAGE
+// ══════════════════════════════════════════
+function renderBadge() {
+  var stats   = loadUserStats();
+  var myBadge = getUserBadge();
+
+  var reqData = [
+    { key:'seed',  label:'씨앗', color:'seed',  desc:'첫 낙서를 던진 용기 있는 자', req:'낙서 1개 이상', earned: myBadge >= 0 },
+    { key:'leaf',  label:'잎사귀', color:'leaf', desc:'꾸준히 벽을 채우는 낙서꾼',   req:'낙서 3개 + 반응 5개', earned: myBadge >= 1 },
+    { key:'fruit', label:'열매',   color:'fruit',desc:'낙서벽의 전설적인 존재',       req:'낙서 10개 + 반응 30개', earned: myBadge >= 2 },
+  ];
+
+  var svgFns = [seedSVG, leafSVG, fruitSVG];
+
+  var badgeCards = reqData.map(function(d, i) {
+    var locked = !d.earned ? '<div class="badge-locked">🔒</div>' : '';
+    return '<div class="badge-card '+(d.earned?'earned ':'')+d.color+'">'+
+      svgFns[i](d.earned)+
+      '<div class="badge-name '+d.color+'">'+BADGE_EMOJIS[i]+' '+d.label+'</div>'+
+      '<div class="badge-desc">'+d.desc+'</div>'+
+      '<div class="badge-req">조건: '+d.req+'</div>'+
+      locked+'</div>';
+  }).join('');
+
+  var tierInfo = [
+    { emoji:'🌱', name:'씨앗벽', desc:'반응 합계 0~5', req:'씨앗 뱃지 필요', minBadge: 0 },
+    { emoji:'🍃', name:'잎사귀벽', desc:'반응 합계 6~14', req:'잎사귀 뱃지 필요', minBadge: 1 },
+    { emoji:'🍎', name:'열매벽', desc:'반응 합계 15+, 영구 저장', req:'열매 뱃지 필요', minBadge: 2 },
+  ];
+
+  var tierCards = tierInfo.map(function(t) {
+    var canEnter = myBadge >= t.minBadge;
+    var tabName = ['seed','leaf','fruit'][t.minBadge];
+    return '<div class="badge-card" style="cursor:pointer;'+(canEnter?'':'opacity:0.5')+'" onclick="'+(canEnter?'switchTab(\''+tabName+'\')':'showToast(\''+t.req+' 🔒\')')+'">'
+      +'<div style="font-size:32px;margin-bottom:8px">'+t.emoji+'</div>'
+      +'<div class="badge-name '+BADGE_COLORS[t.minBadge]+'">'+t.name+'</div>'
+      +'<div class="badge-desc">'+t.desc+'</div>'
+      +'<div class="badge-req">'+t.req+'</div>'
+      +(canEnter ? '<div style="font-size:10px;color:#90EE90;margin-top:6px">✓ 입장 가능</div>' : '<div class="badge-locked">🔒</div>')
+      +'</div>';
+  }).join('');
+
+  document.getElementById('view-badge').innerHTML =
+    '<div class="my-stats">'+
+    '<div class="my-stats-title">MY STATS · 내 활동</div>'+
+    '<div class="stat-row"><span class="stat-label">🏅 내 뱃지</span><span class="stat-value">'+(myBadge >= 0 ? BADGE_EMOJIS[myBadge]+' '+BADGE_NAMES[myBadge] : '없음')+'</span></div>'+
+    '<div class="stat-row"><span class="stat-label">✍️ 낙서 수</span><span class="stat-value">'+stats.posts+'개</span></div>'+
+    '<div class="stat-row"><span class="stat-label">❤️ 받은 반응</span><span class="stat-value">'+stats.reactions+'개</span></div>'+
+    '</div>'+
+    '<div class="badge-section">'+
+    '<div class="badge-section-title">BADGES · 뱃지</div>'+
+    '<div class="badge-cards">'+badgeCards+'</div>'+
+    '</div>'+
+    '<div class="badge-section">'+
+    '<div class="badge-section-title">TIER WALLS · 단계별 낙서벽</div>'+
+    '<div class="badge-cards">'+tierCards+'</div>'+
+    '</div>';
+}
+
+// ══════════════════════════════════════════
+// TIER GATE CHECK
+// ══════════════════════════════════════════
+function checkTierAccess(tab) {
+  var myBadge = getUserBadge();
+  var required = { seed: 0, leaf: 1, fruit: 2 };
+  if (tab in required && myBadge < required[tab]) {
+    var names = { seed:'씨앗', leaf:'잎사귀', fruit:'열매' };
+    var viewId = 'view-' + tab;
+    document.getElementById(viewId).innerHTML =
+      '<div class="tier-gate">'+
+      '<div class="tier-gate-icon">'+BADGE_EMOJIS[required[tab]]+'</div>'+
+      '<div class="tier-gate-title">'+BADGE_NAMES[required[tab]]+' 뱃지 필요</div>'+
+      '<div class="tier-gate-desc">이 낙서벽은 '+BADGE_NAMES[required[tab]]+' 뱃지를 보유한 유저만 입장할 수 있어요.<br><br>뱃지 탭에서 획득 조건을 확인하세요! 🏅</div>'+
+      '</div>';
+    return false;
+  }
+  return true;
+}
+
+// ══════════════════════════════════════════
+// BADGE ICON UPDATE
+// ══════════════════════════════════════════
+function updateBadgeIcon() {
+  var b = getUserBadge();
+  document.getElementById('user-badge-icon').textContent = b >= 0 ? BADGE_EMOJIS[b] : '';
+}
+
+// ══════════════════════════════════════════
+// SWITCH TAB
+// ══════════════════════════════════════════
+var ALL_TABS = ['wall','today','seed','leaf','fruit','badge'];
+function switchTab(tab) {
+  currentTab = tab;
+  ALL_TABS.forEach(function(t) {
+    var el = document.getElementById('tab-'+t);
+    if (el) el.className = el.className.replace(' active','') + (t===tab?' active':'');
+    var vel = document.getElementById('view-'+t);
+    if (vel) vel.style.display = 'none';
+    var fnel = document.getElementById('fnav-'+t);
+    if (fnel) fnel.className = 'footer-nav-btn' + (t===tab?' active':'');
+  });
+  document.getElementById('view-'+tab).style.display = tab==='today'||tab==='badge' ? 'block' : 'flex';
+  document.getElementById('input-area').style.display = (tab==='badge'||tab==='today') ? 'none' : 'block';
+
+  if (tab === 'wall')  renderWall('view-wall');
+  else if (tab === 'today') renderToday();
+  else if (tab === 'badge') renderBadge();
+  else if (tab === 'seed') {
+    if (checkTierAccess('seed'))  renderWall('view-seed', function(n){ return calcTier(n.reactions) === 0; });
+  }
+  else if (tab === 'leaf') {
+    if (checkTierAccess('leaf'))  renderWall('view-leaf', function(n){ return calcTier(n.reactions) === 1; });
+  }
+  else if (tab === 'fruit') {
+    if (checkTierAccess('fruit')) renderWall('view-fruit', function(n){ return calcTier(n.reactions) === 2; });
+  }
+}
+
+function renderCurrent() { switchTab(currentTab); }
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+pruneAndUpgrade();
+loadMyReacted();
+updateBadgeIcon();
+
+// 방문 카운터
+var visits = incVisit();
+updateVisitDisplay(visits);
+
+// 벽 렌더
+renderWall('view-wall');
+updateMoonBanner();
+
+// Pi 인증
+PiService.login().then(function(result) {
+  if(result.success) {
+    currentUser = result.user;
+    document.getElementById('user-dot').classList.add('online');
+    document.getElementById('user-label').textContent = '@'+currentUser.username+' · 익명으로 낙서 중';
+    document.getElementById('throw-btn').disabled = false;
+    document.getElementById('input-hint').textContent = '@'+currentUser.username+' (익명 표시)';
+  } else {
+    document.getElementById('user-label').textContent = '로그인 필요 · Sign in required';
+    document.getElementById('throw-btn').disabled = false;
+  }
+});
+
+// 1분마다 pruning + 갱신
+setInterval(function() { pruneAndUpgrade(); updateMoonBanner(); renderCurrent(); }, 60000);
+</script>
+</body>
+</html>
