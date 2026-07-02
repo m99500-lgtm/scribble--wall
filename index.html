@@ -161,7 +161,7 @@
   <div class="moon-banner" id="moon-banner" onclick="scrollToMoon()">
     <canvas class="moon-banner-stars" id="star-canvas"></canvas>
     <div class="moon-banner-content">
-      <div class="moon-banner-label">🚀 이번 주 최고 낙서 · WEEK'S BEST</div>
+      <div class="moon-banner-label">🚀 이번 주 가장 많은 마음을 건드린 이야기</div>
       <div class="moon-banner-text" id="moon-text">—</div>
       <div class="moon-banner-en" id="moon-en"></div>
     </div>
@@ -172,7 +172,7 @@
   <div class="header">
     <div>
       <div class="logo-kr">낙서<span>벽</span></div>
-      <div class="logo-en">Scribble<span>Wall</span> · 한 줄 · One line</div>
+      <div class="logo-en">삶의 모든 순간, 한 줄이면 충분해</div>
     </div>
     <div class="tab-row">
       <button class="tab active" id="tab-wall" onclick="switchTab('wall')">벽<br/>Wall</button>
@@ -187,25 +187,25 @@
   <!-- USER / SYNC -->
   <div class="user-badge">
     <div class="user-dot" id="user-dot"></div>
-    <span id="user-label">연결 중... · Connecting...</span>
+    <span id="user-label">오늘의 이야기를 준비하는 중...</span>
     <span class="badge-icon" id="user-badge-icon"></span>
   </div>
   <div class="sync-bar">
     <div class="sync-dot" id="sync-dot"></div>
-    <span id="sync-label">DB 연결 중...</span>
+    <span id="sync-label">이야기들을 모으는 중이에요...</span>
   </div>
 
   <!-- INPUT -->
   <div class="input-area" id="input-area">
     <div class="input-box">
       <input type="text" id="note-input" maxlength="28"
-        placeholder="한 줄만 던져봐... / Just one line..."
+        placeholder="오늘 하루 어땠나요? 한 줄로 던져보세요..."
         oninput="onInput()"
         onkeydown="if(event.key==='Enter') throwNote()" />
       <span class="char-count" id="char-count">0/28</span>
     </div>
     <div class="input-footer">
-      <span class="input-hint" id="input-hint">익명 · anonymous</span>
+      <span class="input-hint" id="input-hint">익명으로 안전하게 · 당신의 이야기를 들을게요</span>
       <button class="throw-btn" id="throw-btn" onclick="throwNote()" disabled>
         던지기 · Throw 🪄
       </button>
@@ -213,7 +213,7 @@
   </div>
 
   <!-- VIEWS -->
-  <div class="wall" id="view-wall"><div class="loading">낙서 불러오는 중... ✨</div></div>
+  <div class="wall" id="view-wall"><div class="loading">오늘의 이야기들을 불러오는 중이에요 ✨</div></div>
   <div class="today-wrap" id="view-today" style="display:none"></div>
   <div class="wall" id="view-seed" style="display:none"></div>
   <div class="wall" id="view-leaf" style="display:none"></div>
@@ -289,7 +289,7 @@ function getBinId() {
 }
 
 function createBin(data) {
-  setSyncStatus('syncing', 'DB 초기화 중...');
+  setSyncStatus('syncing', '처음 방문이시군요, 준비하는 중이에요...');
   return fetch(JSONBIN_BASE + '/b', {
     method: 'POST',
     headers: {
@@ -304,11 +304,11 @@ function createBin(data) {
   .then(function(d){
     binId = d.metadata.id;
     try { localStorage.setItem(BIN_ID_KEY, binId); } catch(e) {}
-    setSyncStatus('synced', '저장 완료 ✓');
+    setSyncStatus('synced', '이야기가 안전하게 저장됐어요 ✓');
     return binId;
   })
   .catch(function(e){
-    setSyncStatus('error', '연결 오류 — 오프라인 모드');
+    setSyncStatus('error', '연결 오류 — 잠시 연결이 끊겼어요 — 곧 돌아올게요');
     console.error(e);
   });
 }
@@ -328,7 +328,7 @@ function writeBin(data) {
   var id = getBinId();
   if (!id || isSyncing) return Promise.resolve();
   isSyncing = true;
-  setSyncStatus('syncing', '저장 중...');
+  setSyncStatus('syncing', '이야기를 저장하는 중이에요...');
   return fetch(JSONBIN_BASE + '/b/' + id, {
     method: 'PUT',
     headers: {
@@ -340,11 +340,11 @@ function writeBin(data) {
   .then(function(r){ return r.json(); })
   .then(function(){
     isSyncing = false;
-    setSyncStatus('synced', '저장 완료 ✓');
+    setSyncStatus('synced', '이야기가 안전하게 저장됐어요 ✓');
   })
   .catch(function(){
     isSyncing = false;
-    setSyncStatus('error', '저장 실패 — 재시도 중...');
+    setSyncStatus('error', '잠시 후 다시 시도할게요...');
     setTimeout(function(){ writeBin(data); }, 3000);
   });
 }
@@ -385,7 +385,7 @@ function initDB() {
       updateVisitDisplay();
     });
   } else {
-    setSyncStatus('syncing', '낙서 불러오는 중...');
+    setSyncStatus('syncing', '오늘의 이야기들을 모으는 중이에요...');
     readBin().then(function(data){
       if (data && data.notes && data.notes.length) {
         notes = data.notes;
@@ -399,7 +399,7 @@ function initDB() {
       renderCurrent();
       updateMoonBanner();
       updateVisitDisplay();
-      setSyncStatus('synced', '불러오기 완료 ✓');
+      setSyncStatus('synced', '이야기를 모두 불러왔어요 ✓');
     }).catch(function(){
       // 오프라인 — localStorage 폴백
       try {
@@ -411,7 +411,7 @@ function initDB() {
         notes = SAMPLE_NOTES.map(function(n){ return Object.assign({},n); });
         visits = 1;
       }
-      setSyncStatus('error', '오프라인 모드');
+      setSyncStatus('error', '잠시 연결이 끊겼어요 — 곧 돌아올게요');
       pruneAndUpgrade();
       renderCurrent();
       updateMoonBanner();
@@ -559,7 +559,7 @@ function throwNote() {
   var stats=loadUserStats(); stats.posts++; saveUserStats(stats);
   updateBadgeIcon();
   renderCurrent();
-  showToast('번역 중... 🪄');
+  showToast('이야기를 담는 중이에요...');
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
@@ -572,11 +572,11 @@ function throwNote() {
   .then(function(data){
     var en=(data.content&&data.content[0])?data.content[0].text.trim():'...';
     notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:en,translating:false,isNew:false}):n; });
-    saveAll(); renderCurrent(); showToast('벽에 던졌어요 🪄');
+    saveAll(); renderCurrent(); showToast('당신의 이야기가 벽에 새겨졌어요 ✨');
   })
   .catch(function(){
     notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:'...',translating:false,isNew:false}):n; });
-    saveAll(); renderCurrent(); showToast('벽에 던졌어요 🪄');
+    saveAll(); renderCurrent(); showToast('당신의 이야기가 벽에 새겨졌어요 ✨');
   });
 }
 
@@ -599,7 +599,7 @@ function react(noteId, key) {
   });
   if(!on){ var s=loadUserStats(); s.reactions++; saveUserStats(s); }
   saveAll(); pruneAndUpgrade(); updateMoonBanner(); renderCurrent();
-  if(!on) showToast(LABELS[key]+' 반응했어요!');
+  if(!on) showToast(LABELS[key]+' — 당신의 마음이 닿았어요 🌱');
 }
 
 // ══════════════════════════════════════════
@@ -633,7 +633,7 @@ function renderWall(elId, filterFn) {
     return (b.reactions.k+b.reactions.u+b.reactions.e)-(a.reactions.k+a.reactions.u+a.reactions.e)||b.ts-a.ts;
   });
   var el=document.getElementById(elId);
-  if(!list.length){ el.innerHTML='<div class="empty">아직 아무도 없어요<small>Be the first.</small></div>'; return; }
+  if(!list.length){ el.innerHTML='<div class="empty">아직 아무도 이야기를 꺼내지 않았어요<small>당신의 한 줄이 첫 번째가 될 수 있어요</small></div>'; return; }
   el.innerHTML=list.map(noteCard).join('');
 }
 
@@ -661,16 +661,16 @@ function fruitSVG(e){ var o=e?1:0.3; return '<svg class="badge-svg" viewBox="0 0
 function renderBadge() {
   var stats=loadUserStats(), myBadge=getUserBadge();
   var bdata=[
-    {key:'seed',label:'씨앗',color:'seed',desc:'첫 낙서를 던진 용기 있는 자',req:'낙서 1개 이상',earned:myBadge>=0,svg:seedSVG},
-    {key:'leaf',label:'잎사귀',color:'leaf',desc:'꾸준히 벽을 채우는 낙서꾼',req:'낙서 3개 + 반응 5개',earned:myBadge>=1,svg:leafSVG},
-    {key:'fruit',label:'열매',color:'fruit',desc:'낙서벽의 전설적인 존재',req:'낙서 10개 + 반응 30개',earned:myBadge>=2,svg:fruitSVG},
+    {key:'seed',label:'씨앗',color:'seed',desc:'삶의 이야기를 처음 꺼낸 용기 있는 사람',req:'낙서 1개 이상',earned:myBadge>=0,svg:seedSVG},
+    {key:'leaf',label:'잎사귀',color:'leaf',desc:'삶을 꾸준히 기록하며 나누는 사람',req:'낙서 3개 + 반응 5개',earned:myBadge>=1,svg:leafSVG},
+    {key:'fruit',label:'열매',color:'fruit',desc:'당신의 한 줄이 많은 이의 마음에 닿았어요',req:'낙서 10개 + 반응 30개',earned:myBadge>=2,svg:fruitSVG},
   ];
   var badgeCards=bdata.map(function(d){
     return '<div class="badge-card '+(d.earned?'earned ':'')+d.color+'">'+
       d.svg(d.earned)+
       '<div class="badge-name '+d.color+'">'+BADGE_EMOJIS[bdata.indexOf(d)]+' '+d.label+'</div>'+
       '<div class="badge-desc">'+d.desc+'</div>'+
-      '<div class="badge-req">조건: '+d.req+'</div>'+
+      '<div class="badge-req">들어오려면: '+d.req+'</div>'+
       (!d.earned?'<div class="badge-locked">🔒</div>':'')+
       '</div>';
   }).join('');
@@ -686,18 +686,18 @@ function renderBadge() {
       '<div class="badge-name '+BADGE_COLORS[t.min]+'">'+t.name+'</div>'+
       '<div class="badge-desc">'+t.desc+'</div>'+
       '<div class="badge-req">'+t.req+'</div>'+
-      (ok?'<div style="font-size:10px;color:#90EE90;margin-top:6px">✓ 입장 가능</div>':'<div class="badge-locked">🔒</div>')+
+      (ok?'<div style="font-size:10px;color:#90EE90;margin-top:6px">✓ 들어갈 수 있어요</div>':'<div class="badge-locked">🔒</div>')+
       '</div>';
   }).join('');
   document.getElementById('view-badge').innerHTML=
     '<div class="my-stats">'+
-    '<div class="my-stats-title">MY STATS · 내 활동</div>'+
-    '<div class="stat-row"><span class="stat-label">🏅 내 뱃지</span><span class="stat-value">'+(myBadge>=0?BADGE_EMOJIS[myBadge]+' '+BADGE_NAMES[myBadge]:'없음')+'</span></div>'+
-    '<div class="stat-row"><span class="stat-label">✍️ 낙서 수</span><span class="stat-value">'+stats.posts+'개</span></div>'+
-    '<div class="stat-row"><span class="stat-label">❤️ 준 반응</span><span class="stat-value">'+stats.reactions+'개</span></div>'+
+    '<div class="my-stats-title">나의 이야기 기록</div>'+
+    '<div class="stat-row"><span class="stat-label">🏅 나의 등급</span><span class="stat-value">'+(myBadge>=0?BADGE_EMOJIS[myBadge]+' '+BADGE_NAMES[myBadge]:'아직 이야기를 꺼내지 않으셨어요')+'</span></div>'+
+    '<div class="stat-row"><span class="stat-label">✍️ 남긴 이야기</span><span class="stat-value">'+stats.posts+'개</span></div>'+
+    '<div class="stat-row"><span class="stat-label">❤️ 마음을 건넨 횟수</span><span class="stat-value">'+stats.reactions+'개</span></div>'+
     '</div>'+
-    '<div class="badge-section"><div class="badge-section-title">BADGES · 뱃지</div><div class="badge-cards">'+badgeCards+'</div></div>'+
-    '<div class="badge-section"><div class="badge-section-title">TIER WALLS · 단계별 낙서벽</div><div class="badge-cards">'+tierCards+'</div></div>';
+    '<div class="badge-section"><div class="badge-section-title">이야기꾼의 등급</div><div class="badge-cards">'+badgeCards+'</div></div>'+
+    '<div class="badge-section"><div class="badge-section-title">이야기의 깊이에 따라 나뉘는 공간</div><div class="badge-cards">'+tierCards+'</div></div>';
 }
 
 function checkTierAccess(tab) {
@@ -707,7 +707,7 @@ function checkTierAccess(tab) {
     document.getElementById('view-'+tab).innerHTML=
       '<div class="tier-gate"><div class="tier-gate-icon">'+BADGE_EMOJIS[req[tab]]+'</div>'+
       '<div class="tier-gate-title">'+BADGE_NAMES[req[tab]]+' 뱃지 필요</div>'+
-      '<div class="tier-gate-desc">이 낙서벽은 '+BADGE_NAMES[req[tab]]+' 뱃지 보유자만 입장 가능해요.<br><br>뱃지 탭에서 조건을 확인하세요! 🏅</div></div>';
+      '<div class="tier-gate-desc">이 공간은 '+BADGE_NAMES[req[tab]]+' 이야기를 나눠온 분만 들어올 수 있어요.<br><br>뱃지 탭에서 조건을 확인하고 당신의 이야기를 계속 나눠주세요 🌱</div></div>';
     return false;
   }
   return true;
@@ -764,11 +764,11 @@ PiService.login().then(function(r){
   if(r.success){
     currentUser=r.user;
     document.getElementById('user-dot').classList.add('online');
-    document.getElementById('user-label').textContent='@'+r.user.username+' · 익명으로 낙서 중';
+    document.getElementById('user-label').textContent='@'+r.user.username+' · 오늘의 이야기를 기다리고 있어요';
     document.getElementById('throw-btn').disabled=false;
-    document.getElementById('input-hint').textContent='@'+r.user.username+' (익명 표시)';
+    document.getElementById('input-hint').textContent='@'+r.user.username+' (익명으로 안전하게 남겨져요)';
   } else {
-    document.getElementById('user-label').textContent='로그인 필요 · Sign in required';
+    document.getElementById('user-label').textContent='Pi 계정으로 로그인하면 이야기를 남길 수 있어요';
     document.getElementById('throw-btn').disabled=false;
   }
 });
