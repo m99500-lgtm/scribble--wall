@@ -565,7 +565,7 @@ function throwNote() {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:80,
-      messages:[{role:'user',content:'Translate this Korean one-liner into casual English. Under 10 words. Return ONLY the translation.\n\n"'+text+'"'}]
+      messages:[{role:'user',content:'This is a one-liner: "'+text+'"\n\nDetect the language. If Korean → translate to casual English under 10 words. If English → translate to casual Korean under 15 characters. Return ONLY the translation.'}]
     })
   })
   .then(function(r){return r.json();})
@@ -610,7 +610,8 @@ function noteCard(note) {
   var sc=getSizeClass(note.reactions);
   var tot=note.reactions.k+note.reactions.u+note.reactions.e;
   var hot=tot>=8?'<span class="hot">HOT</span>':'';
-  var enHtml=note.translating?'<div class="translating">translating...</div>':'<div class="note-en">'+(note.en||'')+'</div>';
+  var isKorean=/[가-힣]/.test(note.text);
+  var enHtml=note.translating?(isKorean?'<div class="translating">영어로 옮기는 중...</div>':'<div class="translating">한글로 옮기는 중...</div>'):'<div class="note-en">'+(note.en||'')+'</div>';
   var btns=['k','u','e'].map(function(k){
     var on=myReacted[note.id+'_'+k]?'on-'+k:'';
     return '<button class="react-btn '+on+'" onclick="react(\''+note.id+'\',\''+k+'\')">'+
