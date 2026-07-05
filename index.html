@@ -91,6 +91,8 @@
     .note-sm .note-kr { font-size:16px; } .note-md .note-kr { font-size:18px; } .note-lg .note-kr { font-size:20px; } .note-xl .note-kr { font-size:22px; font-weight:700; }
     .divider { width:22px; height:1px; background:#252532; margin:7px 0; }
     .note-en { font-family:'Georgia',serif; font-style:italic; color:var(--text-sub); line-height:1.4; }
+    .note-kr-trans { font-family:'Nanum Pen Script',cursive; color:var(--text-sub); line-height:1.4; }
+    .note-sm .note-kr-trans { font-size:15px; } .note-md .note-kr-trans { font-size:16px; } .note-lg .note-kr-trans { font-size:17px; } .note-xl .note-kr-trans { font-size:18px; }
     .note-sm .note-en { font-size:12px; } .note-md .note-en { font-size:12px; } .note-lg .note-en { font-size:13px; } .note-xl .note-en { font-size:14px; }
     .translating { font-family:'Georgia',serif; font-style:italic; font-size:12px; color:#444; animation:blink 1.2s infinite; }
     @keyframes blink { 0%,100%{opacity:0.25} 50%{opacity:0.75} }
@@ -610,8 +612,20 @@ function noteCard(note) {
   var sc=getSizeClass(note.reactions);
   var tot=note.reactions.k+note.reactions.u+note.reactions.e;
   var hot=tot>=8?'<span class="hot">HOT</span>':'';
+  var lock=note.permanent?' 🔒':'';
   var isKorean=/[가-힣]/.test(note.text);
-  var enHtml=note.translating?(isKorean?'<div class="translating">영어로 옮기는 중...</div>':'<div class="translating">한글로 옮기는 중...</div>'):'<div class="note-en">'+(note.en||'')+'</div>';
+  var subHtml;
+  if(note.translating){
+    subHtml=isKorean
+      ?'<div class="translating">영어로 옮기는 중...</div>'
+      :'<div class="translating">한글로 옮기는 중...</div>';
+  } else if(isKorean){
+    // 한글 원문 → 영어 번역을 이탤릭으로
+    subHtml='<div class="note-en">'+(note.en||'')+'</div>';
+  } else {
+    // 영어 원문 → 한글 번역을 낙서체로
+    subHtml='<div class="note-kr-trans">'+(note.en||'')+'</div>';
+  }
   var btns=['k','u','e'].map(function(k){
     var on=myReacted[note.id+'_'+k]?'on-'+k:'';
     return '<button class="react-btn '+on+'" onclick="react(\''+note.id+'\',\''+k+'\')">'+
@@ -619,11 +633,10 @@ function noteCard(note) {
   }).join('');
   var tierBadge=note.tier>0?'<div class="note-tier-badge">'+BADGE_EMOJIS[note.tier]+'</div>':'';
   var tierClass=note.tier===2?' tier-fruit':note.tier===1?' tier-leaf':'';
-  var lock=note.permanent?' 🔒':'';
   return '<div class="note '+sc+(note.isNew?' pop':'')+tierClass+'" data-note-id="'+note.id+'" style="opacity:'+op+'">'+
     tierBadge+
     '<div class="note-kr" style="font-family:'+FONTS[note.font]+'">'+note.text+hot+lock+'</div>'+
-    '<div class="divider"></div>'+enHtml+
+    '<div class="divider"></div>'+subHtml+
     '<div class="note-meta"><span class="note-time">'+timeAgo(note.ts)+'</span>'+
     '<div class="reactions">'+btns+'</div></div>'+
     '<div class="life-bar" style="width:'+Math.round(op*100)+'%"></div></div>';
