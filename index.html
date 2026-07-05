@@ -563,17 +563,17 @@ function throwNote() {
   renderCurrent();
   showToast('이야기를 담는 중이에요...');
 
-  fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:80,
-      messages:[{role:'user',content:'This is a one-liner: "'+text+'"\n\nDetect the language. If Korean → translate to casual English under 10 words. If English → translate to casual Korean under 15 characters. Return ONLY the translation.'}]
-    })
-  })
+  var isKoreanText=/[가-힣]/.test(text);
+  var langPair=isKoreanText?'ko|en':'en|ko';
+  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair='+langPair;
+
+  fetch(url)
   .then(function(r){return r.json();})
   .then(function(data){
-    var en=(data.content&&data.content[0])?data.content[0].text.trim():'...';
-    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:en,translating:false,isNew:false}):n; });
+    var translated=(data.responseData&&data.responseData.translatedText)?data.responseData.translatedText.trim():'...';
+    // MyMemory가 대문자로 돌려줄 때 소문자로
+    if(!isKoreanText) translated=translated.charAt(0).toLowerCase()+translated.slice(1);
+    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:translated,translating:false,isNew:false}):n; });
     saveAll(); renderCurrent(); showToast('당신의 이야기가 벽에 새겨졌어요 ✨');
   })
   .catch(function(){
