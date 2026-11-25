@@ -1,797 +1,244 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>낙서벽 · ScribbleWall</title>
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Gaegu&family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0e0e12; --surface: #16161e; --surface2: #1a1a22;
-      --border: #222230; --border2: #2e2e3a;
-      --accent: #c8f060; --accent-dark: #0e0e12;
-      --text: #f0eee8; --text-sub: #6a6a80; --text-muted: #3a3a4a;
-      --red: #FF6B6B; --yellow: #FFD93D; --blue: #6BCFF6;
-      --seed: #90EE90; --leaf: #32CD32; --fruit: #FF8C00;
-      --moon: #FFD700;
-    }
-    body { background: var(--bg); color: var(--text); font-family: 'Nanum Gothic', sans-serif; min-height: 100vh; }
-    .app { max-width: 480px; margin: 0 auto; min-height: 100vh; overflow-x: hidden; position: relative; }
-
-    /* MOON BANNER */
-    .moon-banner { display:none; position:relative; margin:10px 16px 0; background:linear-gradient(135deg,#0a0a1a 0%,#1a1030 50%,#0d0d20 100%); border:1px solid #3a2a60; border-radius:16px; overflow:hidden; padding:14px 16px; cursor:pointer; }
-    .moon-banner.visible { display:block; }
-    .moon-banner-stars { position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; }
-    .moon-banner-content { position:relative; z-index:1; }
-    .moon-banner-label { font-size:9px; letter-spacing:2px; color:var(--moon); font-weight:700; margin-bottom:6px; text-transform:uppercase; }
-    .moon-banner-text { font-family:'Nanum Pen Script',cursive; font-size:22px; color:#fff; line-height:1.3; margin-bottom:4px; }
-    .moon-banner-en { font-family:'Georgia',serif; font-style:italic; font-size:12px; color:#aaa8cc; }
-    .moon-emoji { position:absolute; right:16px; top:50%; transform:translateY(-50%); font-size:40px; filter:drop-shadow(0 0 12px rgba(255,215,0,0.5)); animation:moonFloat 3s ease-in-out infinite; }
-    @keyframes moonFloat { 0%,100%{transform:translateY(-50%) translateY(0)} 50%{transform:translateY(-50%) translateY(-6px)} }
-
-    /* SYNC STATUS */
-    .sync-bar { display:flex; align-items:center; gap:6px; padding:4px 20px; font-size:10px; color:#444; }
-    .sync-dot { width:6px; height:6px; border-radius:50%; background:#333; }
-    .sync-dot.syncing { background:var(--yellow); animation:blink 1s infinite; }
-    .sync-dot.synced { background:var(--accent); }
-    .sync-dot.error { background:var(--red); }
-
-    /* HEADER */
-    .header { padding:16px 20px 0; display:flex; align-items:flex-start; justify-content:space-between; }
-    .logo-kr { font-family:'Nanum Pen Script',cursive; font-size:26px; color:var(--text); }
-    .logo-kr span { color:var(--accent); }
-    .logo-en { font-size:11px; color:#555; margin-top:2px; }
-    .logo-en span { color:var(--accent); }
-    .tab-row { display:flex; gap:5px; padding-top:4px; flex-wrap:wrap; justify-content:flex-end; }
-    .tab { background:none; border:1px solid #2a2a32; color:#777; padding:4px 8px; border-radius:20px; font-size:10px; cursor:pointer; font-family:'Nanum Gothic',sans-serif; transition:all 0.2s; line-height:1.5; text-align:center; }
-    .tab.active { background:var(--accent); border-color:var(--accent); color:var(--accent-dark); font-weight:700; }
-    .tab.seed-tab { border-color:var(--seed); color:var(--seed); }
-    .tab.seed-tab.active { background:var(--seed); color:#000; }
-    .tab.leaf-tab { border-color:var(--leaf); color:var(--leaf); }
-    .tab.leaf-tab.active { background:var(--leaf); color:#000; }
-    .tab.fruit-tab { border-color:var(--fruit); color:var(--fruit); }
-    .tab.fruit-tab.active { background:var(--fruit); color:#fff; }
-
-    /* USER BADGE */
-    .user-badge { display:flex; align-items:center; gap:6px; padding:8px 20px 0; font-size:11px; color:#555; }
-    .user-dot { width:7px; height:7px; border-radius:50%; background:#333; transition:background 0.3s; }
-    .user-dot.online { background:var(--accent); }
-    .badge-icon { font-size:14px; margin-left:4px; }
-
-    /* TIER GATE */
-    .tier-gate { margin:16px; padding:20px; background:var(--surface); border:1px solid var(--border2); border-radius:16px; text-align:center; }
-    .tier-gate-icon { font-size:36px; margin-bottom:8px; }
-    .tier-gate-title { font-size:15px; font-weight:700; margin-bottom:6px; }
-    .tier-gate-desc { font-size:12px; color:#666; line-height:1.6; }
-
-    /* INPUT */
-    .input-area { padding:12px 20px 10px; position:sticky; top:0; z-index:10; background:linear-gradient(to bottom,var(--bg) 85%,transparent); }
-    .input-box { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1.5px solid var(--border2); border-radius:14px; padding:10px 14px; transition:border-color 0.2s; }
-    .input-box:focus-within { border-color:var(--accent); }
-    .input-box input { flex:1; background:none; border:none; outline:none; color:var(--text); font-family:'Nanum Pen Script',cursive; font-size:19px; caret-color:var(--accent); }
-    .input-box input::placeholder { color:#444; }
-    .char-count { font-size:11px; color:#444; min-width:34px; text-align:right; }
-    .char-count.warn { color:var(--red); }
-    .input-footer { display:flex; justify-content:space-between; align-items:center; margin-top:7px; }
-    .input-hint { font-size:11px; color:#555; }
-    .throw-btn { background:var(--accent); border:none; border-radius:10px; padding:7px 16px; color:var(--accent-dark); font-weight:700; font-size:12px; cursor:pointer; font-family:'Nanum Gothic',sans-serif; transition:opacity 0.15s,transform 0.1s; }
-    .throw-btn:active { transform:scale(0.95); }
-    .throw-btn:disabled { opacity:0.3; cursor:default; }
-
-    /* WALL */
-    .wall { padding:4px 16px 100px; display:flex; flex-direction:column; gap:10px; }
-    .note { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px 10px; position:relative; overflow:hidden; transition:opacity 0.6s; }
-    .note.pop { animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-    @keyframes popIn { from{transform:scale(0.85) translateY(-8px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
-    .note-tier-badge { position:absolute; top:10px; right:10px; font-size:16px; }
-    .note-kr { line-height:1.4; word-break:keep-all; color:var(--text); }
-    .note-sm .note-kr { font-size:16px; } .note-md .note-kr { font-size:18px; } .note-lg .note-kr { font-size:20px; } .note-xl .note-kr { font-size:22px; font-weight:700; }
-    .divider { width:22px; height:1px; background:#252532; margin:7px 0; }
-    .note-en { font-family:'Georgia',serif; font-style:italic; color:var(--text-sub); line-height:1.4; }
-    .note-kr-trans { font-family:'Nanum Pen Script',cursive; color:var(--text-sub); line-height:1.4; }
-    .note-sm .note-kr-trans { font-size:15px; } .note-md .note-kr-trans { font-size:16px; } .note-lg .note-kr-trans { font-size:17px; } .note-xl .note-kr-trans { font-size:18px; }
-    .note-sm .note-en { font-size:12px; } .note-md .note-en { font-size:12px; } .note-lg .note-en { font-size:13px; } .note-xl .note-en { font-size:14px; }
-    .translating { font-family:'Georgia',serif; font-style:italic; font-size:12px; color:#444; animation:blink 1.2s infinite; }
-    @keyframes blink { 0%,100%{opacity:0.25} 50%{opacity:0.75} }
-    .note-meta { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
-    .note-time { font-size:10px; color:var(--text-muted); }
-    .reactions { display:flex; gap:5px; }
-    .react-btn { display:flex; align-items:center; gap:3px; background:#1e1e28; border:1px solid #2a2a36; border-radius:20px; padding:3px 9px; cursor:pointer; color:#999; font-size:12px; font-family:'Nanum Gothic',sans-serif; transition:all 0.15s; -webkit-tap-highlight-color:transparent; }
-    .react-btn:active { transform:scale(0.88); }
-    .react-btn.on-k { border-color:var(--yellow); color:var(--yellow); }
-    .react-btn.on-u { border-color:var(--blue); color:var(--blue); }
-    .react-btn.on-e { border-color:var(--red); color:var(--red); }
-    .hot { display:inline-block; background:var(--red); color:#fff; font-size:9px; font-weight:700; padding:1px 5px; border-radius:5px; margin-left:7px; vertical-align:middle; }
-    .life-bar { position:absolute; bottom:0; left:0; height:2px; background:linear-gradient(to right,var(--accent),var(--blue)); transition:width 1s linear; }
-    .note.tier-leaf { border-color:#1e4020; }
-    .note.tier-fruit { border-color:#4a2800; background:linear-gradient(180deg,#1a1208 0%,#16161e 100%); }
-
-    /* TODAY */
-    .today-wrap { padding:12px 20px 100px; }
-    .today-label { font-size:10px; color:#555; letter-spacing:1.2px; margin-bottom:14px; }
-    .best-card { border-left:3px solid var(--accent); padding:12px 16px; margin-bottom:12px; background:#13131a; border-radius:0 12px 12px 0; }
-    .best-rank { font-size:11px; color:var(--accent); font-weight:700; margin-bottom:5px; }
-    .best-kr { font-family:'Nanum Pen Script',cursive; font-size:20px; color:var(--text); margin-bottom:3px; }
-    .best-en { font-family:'Georgia',serif; font-style:italic; font-size:13px; color:#556; margin-bottom:8px; }
-    .best-stats { font-size:11px; color:#555; }
-
-    /* BADGE PAGE */
-    .badge-page { padding:16px 16px 100px; }
-    .badge-section { margin-bottom:24px; }
-    .badge-section-title { font-size:11px; color:#555; letter-spacing:1.2px; margin-bottom:12px; }
-    .badge-cards { display:flex; gap:10px; }
-    .badge-card { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 10px; text-align:center; position:relative; overflow:hidden; }
-    .badge-card.earned.seed { border-color:#2a4a2a; background:linear-gradient(180deg,#0e1e0e 0%,#16161e 100%); }
-    .badge-card.earned.leaf { border-color:#1a4a1a; background:linear-gradient(180deg,#0a1a0a 0%,#16161e 100%); }
-    .badge-card.earned.fruit { border-color:#4a2a00; background:linear-gradient(180deg,#1a0e00 0%,#16161e 100%); }
-    .badge-svg { width:60px; height:60px; margin:0 auto 8px; display:block; }
-    .badge-name { font-size:13px; font-weight:700; margin-bottom:4px; }
-    .badge-name.seed { color:var(--seed); } .badge-name.leaf { color:var(--leaf); } .badge-name.fruit { color:var(--fruit); }
-    .badge-desc { font-size:10px; color:#555; line-height:1.5; }
-    .badge-req { font-size:10px; color:#444; margin-top:6px; }
-    .badge-locked { position:absolute; inset:0; background:rgba(0,0,0,0.5); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:24px; }
-    .my-stats { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
-    .my-stats-title { font-size:11px; color:#555; letter-spacing:1.2px; margin-bottom:12px; }
-    .stat-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); }
-    .stat-row:last-child { border-bottom:none; }
-    .stat-label { font-size:12px; color:#888; }
-    .stat-value { font-size:13px; font-weight:700; color:var(--accent); }
-
-    /* FOOTER */
-    .footer-bar { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:rgba(14,14,18,0.95); backdrop-filter:blur(10px); border-top:1px solid var(--border); padding:10px 20px; display:flex; justify-content:space-between; align-items:center; z-index:50; }
-    .footer-nav { display:flex; gap:4px; }
-    .footer-nav-btn { background:none; border:none; color:#555; font-size:10px; padding:4px 8px; cursor:pointer; border-radius:8px; font-family:'Nanum Gothic',sans-serif; transition:all 0.2s; }
-    .footer-nav-btn.active { color:var(--accent); background:rgba(200,240,96,0.1); }
-    .visit-counter { display:flex; align-items:center; gap:6px; font-size:10px; color:#555; }
-    .visit-counter-num { font-size:13px; font-weight:700; color:var(--accent); }
-
-    /* TOAST */
-    #toast { display:none; position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:#1e1e28; border:1px solid #333; color:var(--text); padding:10px 20px; border-radius:24px; font-size:13px; z-index:200; white-space:nowrap; animation:fadeUp 0.3s ease; }
-    @keyframes fadeUp { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-    .empty { text-align:center; padding:60px 0; font-family:'Nanum Pen Script',cursive; font-size:20px; color:#333; line-height:2.2; }
-    .empty small { font-family:'Georgia',serif; font-style:italic; font-size:13px; color:#444; display:block; }
-    .loading { text-align:center; padding:40px 0; font-size:13px; color:#444; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>유이 아카이브 · 007로저의 파이 아침 브리핑</title>
+<meta name="description" content="007로저가 매일 아침 X에 올리는 파이 네트워크 브리핑 '유이'를 날짜별로 모아 둔 곳. 사기 경보만 모아 보기, 검색 가능.">
+<meta property="og:title" content="유이 아카이브 · 007로저">
+<meta property="og:description" content="매일 아침 파이 소식과 사기 경보를 한곳에 🍀">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#f6f3ec; --card:#fffdf8; --ink:#2a2620; --sub:#6d665a; --line:#e4ddcf;
+  --accent:#3f7d4e; --accent-soft:rgba(63,125,78,.10);
+  --warn:#b4372f; --warn-soft:rgba(180,55,47,.08);
+  --sun:#c98a12; --chip:#efe9dc;
+  --serif:"Gowun Batang","Nanum Myeongjo",serif;
+  --sans:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#14130f; --card:#1d1b16; --ink:#ece6d8; --sub:#a59d8c; --line:#2f2c25;
+    --accent:#7cc48d; --accent-soft:rgba(124,196,141,.12); --warn:#ef8a80; --warn-soft:rgba(239,138,128,.10);
+    --sun:#f0b84a; --chip:#26231d; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.7}
+a{color:var(--accent)}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 80px}
+header{padding:36px 0 18px}
+.eyebrow{font-size:12.5px;color:var(--sub);letter-spacing:.04em}
+h1{font-family:var(--serif);font-size:clamp(34px,8vw,48px);line-height:1.15;margin:6px 0 8px}
+h1 span{color:var(--accent)}
+.lede{margin:0;color:var(--sub);font-size:15px}
+.by{margin-top:10px;font-size:13.5px;color:var(--sub)}
+.tools{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 12px;border-bottom:1px solid var(--line)}
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px}
+.search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.search select{min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px;padding:0 8px;max-width:42%}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{min-height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:13.5px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.warn[aria-pressed="true"]{background:var(--warn);border-color:var(--warn)}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{font-size:13px;color:var(--sub);margin:14px 2px 0;min-height:20px}
+.day{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 18px 14px;margin-top:16px;scroll-margin-top:150px}
+.day-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.day-date{font-family:var(--serif);font-size:22px;font-weight:700;margin:0}
+.day-wd{font-size:13px;color:var(--sub)}
+.day-link{margin-left:auto;min-height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--sub);font:inherit;font-size:12.5px;cursor:pointer}
+.day-link:focus-visible{outline:2px solid var(--accent)}
+.sec{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.sec:first-of-type{border-top:none;padding-top:0}
+.sec-h{font-size:14px;font-weight:700;color:var(--accent);margin:0 0 4px}
+.sec.scam{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:12px;padding:10px 12px;margin-top:14px}
+.sec.scam .sec-h{color:var(--warn)}
+.sec.poll .sec-h{color:var(--sun)}
+.txt{white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;font-size:15.5px}
+mark{background:rgba(240,184,74,.45);color:inherit;border-radius:3px;padding:0 1px}
+.more{display:block;width:100%;min-height:48px;margin-top:18px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+.more[hidden]{display:none}
+.empty{margin-top:24px;padding:24px;border:1px dashed var(--line);border-radius:16px;text-align:center;color:var(--sub)}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);font-size:13.5px;color:var(--sub)}
+footer p{margin:6px 0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:13.5px;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
 </head>
 <body>
-<div class="app">
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PI MORNING BRIEFING ARCHIVE</div>
+    <h1>유이 <span>아카이브</span></h1>
+    <p class="lede">매일 아침 X에 올리는 파이 네트워크 한 줄 정리, 유머와 이슈, 그리고 사기 경보를 날짜별로 모아 두는 곳이에요. 🍀</p>
+    <div class="by">007로저 · <a href="https://x.com/minkyeungsoon31" target="_blank" rel="noopener">X @minkyeungsoon31</a></div>
+  </header>
 
-  <!-- MOON BANNER -->
-  <div class="moon-banner" id="moon-banner" onclick="scrollToMoon()">
-    <canvas class="moon-banner-stars" id="star-canvas"></canvas>
-    <div class="moon-banner-content">
-      <div class="moon-banner-label">🚀 이번 주 가장 많은 마음을 건드린 이야기</div>
-      <div class="moon-banner-text" id="moon-text">—</div>
-      <div class="moon-banner-en" id="moon-en"></div>
+  <div class="tools">
+    <div class="search">
+      <label for="q" class="sr" style="position:absolute;left:-9999px">유이 검색</label>
+      <input id="q" type="search" placeholder="검색 (예: KYC, 거래소, 패스프레이즈)" autocomplete="off">
+      <label for="jump" style="position:absolute;left:-9999px">날짜로 가기</label>
+      <select id="jump"><option value="">날짜로 가기</option></select>
     </div>
-    <div class="moon-emoji">🌕</div>
-  </div>
-
-  <!-- HEADER -->
-  <div class="header">
-    <div>
-      <div class="logo-kr">낙서<span>벽</span></div>
-      <div class="logo-en">삶의 모든 순간, 한 줄이면 충분해</div>
-    </div>
-    <div class="tab-row">
-      <button class="tab active" id="tab-wall" onclick="switchTab('wall')">벽<br/>Wall</button>
-      <button class="tab" id="tab-today" onclick="switchTab('today')">오늘의<br/>Best</button>
-      <button class="tab seed-tab" id="tab-seed" onclick="switchTab('seed')">🌱<br/>씨앗</button>
-      <button class="tab leaf-tab" id="tab-leaf" onclick="switchTab('leaf')">🍃<br/>잎</button>
-      <button class="tab fruit-tab" id="tab-fruit" onclick="switchTab('fruit')">🍎<br/>열매</button>
-      <button class="tab" id="tab-badge" onclick="switchTab('badge')">🏅<br/>뱃지</button>
+    <div class="chips" role="group" aria-label="보기 고르기">
+      <button type="button" class="chip" data-f="all" aria-pressed="true">전체</button>
+      <button type="button" class="chip warn" data-f="scam" aria-pressed="false">🚨 사기 경보만</button>
+      <button type="button" class="chip" data-f="issue" aria-pressed="false">📰 이슈</button>
+      <button type="button" class="chip" data-f="humor" aria-pressed="false">😄 유머</button>
+      <button type="button" class="chip" data-f="cheer" aria-pressed="false">💬 응원 한마디</button>
     </div>
   </div>
 
-  <!-- USER / SYNC -->
-  <div class="user-badge">
-    <div class="user-dot" id="user-dot"></div>
-    <span id="user-label">오늘의 이야기를 준비하는 중...</span>
-    <span class="badge-icon" id="user-badge-icon"></span>
-  </div>
-  <div class="sync-bar">
-    <div class="sync-dot" id="sync-dot"></div>
-    <span id="sync-label">이야기들을 모으는 중이에요...</span>
-  </div>
+  <div class="status" id="status" role="status" aria-live="polite">불러오는 중…</div>
+  <main id="list"></main>
+  <button type="button" class="more" id="more" hidden>이전 유이 더 보기</button>
 
-  <!-- INPUT -->
-  <div class="input-area" id="input-area">
-    <div class="input-box">
-      <input type="text" id="note-input" maxlength="28"
-        placeholder="오늘 하루 어땠나요? 한 줄로 던져보세요..."
-        oninput="onInput()"
-        onkeydown="if(event.key==='Enter') throwNote()" />
-      <span class="char-count" id="char-count">0/28</span>
-    </div>
-    <div class="input-footer">
-      <span class="input-hint" id="input-hint">익명으로 안전하게 · 당신의 이야기를 들을게요</span>
-      <button class="throw-btn" id="throw-btn" onclick="throwNote()" disabled>
-        던지기 · Throw 🪄
-      </button>
-    </div>
-  </div>
-
-  <!-- VIEWS -->
-  <div class="wall" id="view-wall"><div class="loading">오늘의 이야기들을 불러오는 중이에요 ✨</div></div>
-  <div class="today-wrap" id="view-today" style="display:none"></div>
-  <div class="wall" id="view-seed" style="display:none"></div>
-  <div class="wall" id="view-leaf" style="display:none"></div>
-  <div class="wall" id="view-fruit" style="display:none"></div>
-  <div class="badge-page" id="view-badge" style="display:none"></div>
-
-  <div id="toast"></div>
-
-  <!-- FOOTER -->
-  <div class="footer-bar">
-    <div class="footer-nav">
-      <button class="footer-nav-btn active" id="fnav-wall" onclick="switchTab('wall')">벽</button>
-      <button class="footer-nav-btn" id="fnav-today" onclick="switchTab('today')">Best</button>
-      <button class="footer-nav-btn" id="fnav-badge" onclick="switchTab('badge')">뱃지</button>
-    </div>
-    <div class="visit-counter">
-      <span>👁️</span>
-      <span class="visit-counter-num" id="visit-count">—</span>
-      <span>누적 방문</span>
-    </div>
-  </div>
+  <footer>
+    <p>유이는 그날 아침까지 확인한 내용을 바탕으로 써요. 지난 날짜의 유이는 그날 기준의 이야기예요.</p>
+    <p>투자 권유가 아니에요. 패스프레이즈(24단어)는 누구에게도 알려 주지 마세요.</p>
+    <p>매일의 투표는 <a href="https://dibutades8708.pinet.com" target="_blank" rel="noopener">디부타데스</a>에서 · © 2026 007로저</p>
+  </footer>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
-// ══════════════════════════════════════════
-// JSONBIN CONFIG
-// ══════════════════════════════════════════
-var JSONBIN_KEY = '$2a$10$tFBatsU0eub34KYTBDlylOKQVxpgtPLgzT7ktuJbHG2LLnMFNyt0u';
-var JSONBIN_BASE = 'https://api.jsonbin.io/v3';
-var BIN_ID_KEY = 'sw_bin_id';
-var binId = null;
-var isSyncing = false;
-
-// ── 상태 ──
-var notes = [];
-var visits = 0;
-var myReacted = {};
-var currentTab = 'wall';
-var moonNoteId = null;
-var currentUser = null;
-
-var SAMPLE_NOTES = [
-  {id:'s1',text:'오늘따라 하늘이 유난히 파랗다',en:'The sky looks unusually blue today',reactions:{k:2,u:5,e:1},ts:Date.now()-1000*60*40,font:0,tier:0,permanent:false},
-  {id:'s2',text:'점심 뭐 먹지',en:'What should I have for lunch',reactions:{k:8,u:0,e:3},ts:Date.now()-1000*60*90,font:1,tier:0,permanent:false},
-  {id:'s3',text:'퇴근하고 싶다',en:'I just wanna go home',reactions:{k:12,u:6,e:2},ts:Date.now()-1000*60*20,font:2,tier:1,permanent:false},
-  {id:'s4',text:'비 오는 날엔 왜 이렇게 졸리지',en:'Why am I always sleepy when it rains',reactions:{k:3,u:9,e:0},ts:Date.now()-1000*60*130,font:0,tier:0,permanent:false},
-  {id:'s5',text:'나만 힘든 거 아니지?',en:"It's not just me struggling, right?",reactions:{k:1,u:14,e:4},ts:Date.now()-1000*60*15,font:1,tier:1,permanent:false},
-  {id:'s6',text:'커피 네 잔째인데 눈이 안 떠진다',en:"Fourth coffee, still can't keep my eyes open",reactions:{k:7,u:2,e:5},ts:Date.now()-1000*60*200,font:2,tier:0,permanent:false},
-  {id:'s7',text:'주말이 왜 이렇게 빨리 끝나',en:'Why does the weekend fly by so fast',reactions:{k:4,u:11,e:1},ts:Date.now()-1000*60*60,font:0,tier:1,permanent:false},
-  {id:'s8',text:'그냥 잘 살고 싶다',en:'I just want to live well',reactions:{k:0,u:18,e:6},ts:Date.now()-1000*60*5,font:1,tier:2,permanent:true},
+// ---------- 유이 아카이브 ----------
+// 데이터는 같은 저장소의 yui.md 한 파일. "## 2026-11-25" 줄 아래에 그날 유이를 그대로 붙여 넣으면 됨.
+const SOURCE = 'yui.md';
+const PAGE = 10;
+// 섹션 제목 알아보기 (번호·이모지·기호가 앞에 있어도 됨)
+const SECTIONS = [
+  { key: 'humor', re: /^오늘의\s*유머/, label: '😄 오늘의 유머' },
+  { key: 'issue', re: /^오늘의\s*(이슈|소식)/, label: '📰 오늘의 이슈' },
+  { key: 'scam',  re: /^(오늘의\s*)?사기\s*경보/, label: '🚨 오늘의 사기 경보' },
+  { key: 'doodle',re: /^오늘의\s*낙서/, label: '✏️ 오늘의 낙서' },
+  { key: 'cheer', re: /^응원\s*한\s*마디/, label: '💬 응원 한마디' },
+  { key: 'poll',  re: /^오늘의\s*투표(\s*후보)?/, label: '🗳️ 오늘의 투표 후보' }
 ];
+const WD = ['일','월','화','수','목','금','토'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+let DAYS = [], filter = 'all', query = '', shown = PAGE;
 
-var FONTS = ["'Nanum Pen Script',cursive","'Gaegu',cursive","'Nanum Gothic',sans-serif"];
-var LABELS = {k:'ㅋ',u:'ㅠ',e:'!'};
-var BADGE_EMOJIS = ['🌱','🍃','🍎'];
-var BADGE_NAMES  = ['씨앗','잎사귀','열매'];
-var BADGE_COLORS = ['seed','leaf','fruit'];
-
-// ══════════════════════════════════════════
-// JSONBIN DB
-// ══════════════════════════════════════════
-function setSyncStatus(status, msg) {
-  var dot = document.getElementById('sync-dot');
-  var lbl = document.getElementById('sync-label');
-  dot.className = 'sync-dot ' + status;
-  lbl.textContent = msg;
+function headingKey(line){
+  // 앞쪽 번호·이모지·기호·마크다운 표시를 걷어 내고 제목인지 확인
+  const t = line.replace(/^[\s#>*\-–—_\d.)\]\[|:·•]+/u, '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+  if(t.length > 30) return null;
+  for(const s of SECTIONS) if(s.re.test(t)) return s.key;
+  return null;
 }
-
-function getBinId() {
-  if (binId) return binId;
-  try { binId = localStorage.getItem(BIN_ID_KEY); } catch(e) {}
-  return binId;
+function parseDay(body){
+  const secs = []; let cur = { key: 'intro', lines: [] };
+  for(const line of body.split('\n')){
+    const k = headingKey(line);
+    if(k){ if(cur.lines.join('').trim()) secs.push(cur); cur = { key: k, lines: [] }; }
+    else cur.lines.push(line);
+  }
+  if(cur.lines.join('').trim()) secs.push(cur);
+  return secs.map(s => ({ key: s.key, text: s.lines.join('\n').replace(/^\s*\n+|\s+$/g, '') }));
 }
-
-function createBin(data) {
-  setSyncStatus('syncing', '처음 방문이시군요, 준비하는 중이에요...');
-  return fetch(JSONBIN_BASE + '/b', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Master-Key': JSONBIN_KEY,
-      'X-Bin-Name': 'scribble-wall',
-      'X-Bin-Private': 'false'
-    },
-    body: JSON.stringify(data)
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    binId = d.metadata.id;
-    try { localStorage.setItem(BIN_ID_KEY, binId); } catch(e) {}
-    setSyncStatus('synced', '이야기가 안전하게 저장됐어요 ✓');
-    return binId;
-  })
-  .catch(function(e){
-    setSyncStatus('error', '연결 오류 — 잠시 연결이 끊겼어요 — 곧 돌아올게요');
-    console.error(e);
+function parse(md){
+  const out = []; const re = /^##\s*(\d{4})-(\d{2})-(\d{2})\s*$/gm; let m; const marks = [];
+  while((m = re.exec(md))) marks.push({ date: `${m[1]}-${m[2]}-${m[3]}`, start: m.index, bodyStart: re.lastIndex });
+  marks.forEach((mk, i) => {
+    const body = md.slice(mk.bodyStart, i + 1 < marks.length ? marks[i + 1].start : md.length).replace(/<!--[\s\S]*?-->/g, '');
+    if(body.trim()) out.push({ date: mk.date, secs: parseDay(body) });
   });
+  // 같은 날짜가 두 번이면 처음 것만, 최신 날짜부터
+  const seen = new Set();
+  return out.filter(d => !seen.has(d.date) && seen.add(d.date)).sort((a, b) => b.date.localeCompare(a.date));
 }
-
-function readBin() {
-  var id = getBinId();
-  if (!id) return Promise.resolve(null);
-  return fetch(JSONBIN_BASE + '/b/' + id + '/latest', {
-    headers: { 'X-Master-Key': JSONBIN_KEY }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){ return d.record; })
-  .catch(function(){ return null; });
+function dateLabel(d){
+  const [y, m, day] = d.split('-').map(Number);
+  return { main: `${y}. ${m}. ${day}.`, wd: WD[new Date(Date.UTC(y, m - 1, day)).getUTCDay()] + '요일' };
 }
-
-function writeBin(data) {
-  var id = getBinId();
-  if (!id || isSyncing) return Promise.resolve();
-  isSyncing = true;
-  setSyncStatus('syncing', '이야기를 저장하는 중이에요...');
-  return fetch(JSONBIN_BASE + '/b/' + id, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Master-Key': JSONBIN_KEY
-    },
-    body: JSON.stringify(data)
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(){
-    isSyncing = false;
-    setSyncStatus('synced', '이야기가 안전하게 저장됐어요 ✓');
-  })
-  .catch(function(){
-    isSyncing = false;
-    setSyncStatus('error', '잠시 후 다시 시도할게요...');
-    setTimeout(function(){ writeBin(data); }, 3000);
-  });
+function linkify(html){
+  return html.replace(/(https?:\/\/[^\s<]+[^\s<.,!?)'"])/g, u => `<a href="${u}" target="_blank" rel="noopener nofollow">${u}</a>`);
 }
-
-function saveAll() {
-  // localStorage 백업
-  try {
-    localStorage.setItem('sw_notes', JSON.stringify(notes));
-    localStorage.setItem('sw_visits', visits);
-    localStorage.setItem('sw_reacted', JSON.stringify(myReacted));
-  } catch(e) {}
-  // JSONBin 저장 (디바운스)
-  clearTimeout(saveAll._t);
-  saveAll._t = setTimeout(function(){
-    writeBin({ notes: notes, visits: visits });
-  }, 1500);
+function highlight(html){
+  if(!query) return html;
+  const qs = esc(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 태그 밖의 글자에만 표시
+  return html.replace(/(<[^>]+>)|([^<]+)/g, (all, tag, txt) => tag ? tag : txt.replace(new RegExp(qs, 'gi'), x => `<mark>${x}</mark>`));
 }
-
-// ══════════════════════════════════════════
-// INIT — DB에서 데이터 로드
-// ══════════════════════════════════════════
-function initDB() {
-  // myReacted는 로컬에서만
-  try {
-    var r = localStorage.getItem('sw_reacted');
-    if (r) myReacted = JSON.parse(r);
-  } catch(e) {}
-
-  var id = getBinId();
-  if (!id) {
-    // 첫 실행 — 샘플 데이터로 bin 생성
-    notes = SAMPLE_NOTES.map(function(n){ return Object.assign({},n); });
-    visits = 1;
-    createBin({ notes: notes, visits: visits }).then(function(){
-      pruneAndUpgrade();
-      renderCurrent();
-      updateMoonBanner();
-      updateVisitDisplay();
-    });
-  } else {
-    setSyncStatus('syncing', '오늘의 이야기들을 모으는 중이에요...');
-    readBin().then(function(data){
-      if (data && data.notes && data.notes.length) {
-        notes = data.notes;
-        visits = (data.visits || 0) + 1;
-      } else {
-        notes = SAMPLE_NOTES.map(function(n){ return Object.assign({},n); });
-        visits = 1;
-      }
-      saveAll();
-      pruneAndUpgrade();
-      renderCurrent();
-      updateMoonBanner();
-      updateVisitDisplay();
-      setSyncStatus('synced', '이야기를 모두 불러왔어요 ✓');
-    }).catch(function(){
-      // 오프라인 — localStorage 폴백
-      try {
-        var ln = localStorage.getItem('sw_notes');
-        var lv = localStorage.getItem('sw_visits');
-        notes = ln ? JSON.parse(ln) : SAMPLE_NOTES.map(function(n){ return Object.assign({},n); });
-        visits = lv ? parseInt(lv)+1 : 1;
-      } catch(e) {
-        notes = SAMPLE_NOTES.map(function(n){ return Object.assign({},n); });
-        visits = 1;
-      }
-      setSyncStatus('error', '잠시 연결이 끊겼어요 — 곧 돌아올게요');
-      pruneAndUpgrade();
-      renderCurrent();
-      updateMoonBanner();
-      updateVisitDisplay();
-    });
+function secHtml(s){
+  const def = SECTIONS.find(x => x.key === s.key);
+  const cls = s.key === 'scam' ? ' scam' : s.key === 'poll' ? ' poll' : '';
+  return `<section class="sec${cls}">${def ? `<h3 class="sec-h">${def.label}</h3>` : ''}<div class="txt">${highlight(linkify(esc(s.text)))}</div></section>`;
+}
+function visible(){
+  const q = query.toLowerCase();
+  return DAYS.map(d => {
+    let secs = filter === 'all' ? d.secs : d.secs.filter(s => s.key === filter);
+    if(q) secs = secs.filter(s => s.text.toLowerCase().includes(q) || filter === 'all' && d.date.includes(q));
+    if(q && filter === 'all' && !secs.length && d.date.includes(q)) secs = d.secs;
+    return { date: d.date, secs };
+  }).filter(d => d.secs.length);
+}
+function render(){
+  const list = visible(), part = list.slice(0, shown);
+  $('list').innerHTML = part.map(d => {
+    const L = dateLabel(d.date);
+    return `<article class="day" id="d${d.date}"><div class="day-head"><h2 class="day-date">${L.main}</h2><span class="day-wd">${L.wd}</span>
+      <button type="button" class="day-link" data-date="${d.date}" aria-label="${L.main} 유이 링크 복사">🔗 링크</button></div>
+      ${d.secs.map(secHtml).join('')}</article>`;
+  }).join('') || `<div class="empty">${DAYS.length ? '찾는 내용이 없어요. 다른 말로 검색해 보세요.' : '아직 올라온 유이가 없어요. 곧 채워질 거예요 🍀'}</div>`;
+  $('more').hidden = list.length <= shown;
+  const label = { all: '', scam: '사기 경보', issue: '이슈', humor: '유머', cheer: '응원 한마디' }[filter];
+  $('status').textContent = DAYS.length
+    ? `${query ? `"${query}" ` : ''}${label ? label + ' · ' : ''}${list.length}일치${list.length > shown ? ` 중 ${shown}일 표시` : ''} · 전체 ${DAYS.length}일`
+    : '';
+}
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 1800); }
+async function copy(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); let ok = false; try{ ok = document.execCommand('copy'); }catch(_){} ta.remove(); return ok;
   }
 }
-
-// ══════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════
-function uid() { return Math.random().toString(36).substr(2,9); }
-function timeAgo(ts) {
-  var d=Date.now()-ts,m=Math.floor(d/60000);
-  if(m<1) return '방금 · just now';
-  if(m<60) return m+'분 전 · '+m+'m ago';
-  var h=Math.floor(m/60);
-  if(h<24) return h+'시간 전 · '+h+'h ago';
-  return Math.floor(h/24)+'일 전';
-}
-function calcTier(r) {
-  var t=r.k+r.u+r.e;
-  if(t>=15) return 2;
-  if(t>=6)  return 1;
-  return 0;
-}
-function getOpacity(n) {
-  if(n.permanent) return 1;
-  var hrs=(Date.now()-n.ts)/(1000*60*60);
-  var r=n.reactions;
-  var boost=Math.min((r.k+r.u+r.e)*4,30);
-  var eff=Math.max(0,hrs-boost);
-  if(eff<12) return 1;
-  if(eff<36) return 1-((eff-12)/24)*0.6;
-  return 0.2;
-}
-function getSizeClass(r) {
-  var t=r.k+r.u+r.e;
-  if(t>=10) return 'note-xl';
-  if(t>=5)  return 'note-lg';
-  if(t>=2)  return 'note-md';
-  return 'note-sm';
-}
-function showToast(msg) {
-  var el=document.getElementById('toast');
-  el.textContent=msg; el.style.display='block';
-  clearTimeout(el._t);
-  el._t=setTimeout(function(){ el.style.display='none'; },2500);
-}
-function pruneAndUpgrade() {
-  var now=Date.now();
-  notes=notes.filter(function(n){
-    var tier=calcTier(n.reactions);
-    if(!n.permanent && tier===0) {
-      var t=n.reactions.k+n.reactions.u+n.reactions.e;
-      var age=(now-n.ts)/(1000*60*60);
-      if(t===0 && age>=24) return false;
-    }
-    n.tier=tier;
-    if(tier===2) n.permanent=true;
-    return true;
-  });
-}
-function updateVisitDisplay() {
-  document.getElementById('visit-count').textContent = visits.toLocaleString();
+function goTo(date){
+  if(!DAYS.some(d => d.date === date)) return;
+  filter = 'all'; query = ''; $('q').value = '';
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.f === 'all')));
+  const idx = DAYS.findIndex(d => d.date === date); shown = Math.max(PAGE, idx + 1); render();
+  const el = $('d' + date); if(el) el.scrollIntoView({ block: 'start' });
 }
 
-// ── 유저 통계 (localStorage) ──
-function loadUserStats() {
-  try { var s=localStorage.getItem('sw_stats'); if(s) return JSON.parse(s); } catch(e) {}
-  return {posts:0,reactions:0};
-}
-function saveUserStats(s) {
-  try { localStorage.setItem('sw_stats',JSON.stringify(s)); } catch(e) {}
-}
-function getUserBadge() {
-  var s=loadUserStats();
-  if(s.posts>=10 && s.reactions>=30) return 2;
-  if(s.posts>=3  && s.reactions>=5)  return 1;
-  if(s.posts>=1)                     return 0;
-  return -1;
-}
-function updateBadgeIcon() {
-  var b=getUserBadge();
-  document.getElementById('user-badge-icon').textContent = b>=0 ? BADGE_EMOJIS[b] : '';
-}
-
-// ══════════════════════════════════════════
-// MOON BANNER
-// ══════════════════════════════════════════
-function updateMoonBanner() {
-  var weekAgo=Date.now()-7*24*60*60*1000;
-  var wn=notes.filter(function(n){ return n.ts>=weekAgo; });
-  if(!wn.length) wn=notes;
-  if(!wn.length) return;
-  var best=wn.reduce(function(a,b){
-    return (b.reactions.k+b.reactions.u+b.reactions.e)>(a.reactions.k+a.reactions.u+a.reactions.e)?b:a;
-  });
-  var tot=best.reactions.k+best.reactions.u+best.reactions.e;
-  if(tot<3){ document.getElementById('moon-banner').classList.remove('visible'); return; }
-  moonNoteId=best.id;
-  document.getElementById('moon-text').textContent=best.text;
-  document.getElementById('moon-en').textContent=best.en||'';
-  document.getElementById('moon-banner').classList.add('visible');
-  initStars();
-}
-function initStars() {
-  var canvas=document.getElementById('star-canvas');
-  if(!canvas) return;
-  var ctx=canvas.getContext('2d');
-  canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight;
-  for(var i=0;i<40;i++){
-    ctx.beginPath();
-    ctx.arc(Math.random()*canvas.width,Math.random()*canvas.height,Math.random()*1.2,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,'+(Math.random()*0.6+0.2)+')';
-    ctx.fill();
-  }
-}
-function scrollToMoon() {
-  switchTab('wall');
-  setTimeout(function(){
-    var el=document.querySelector('[data-note-id="'+moonNoteId+'"]');
-    if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
-  },200);
-}
-
-// ══════════════════════════════════════════
-// INPUT / THROW
-// ══════════════════════════════════════════
-function onInput() {
-  var val=document.getElementById('note-input').value;
-  var cc=document.getElementById('char-count');
-  cc.textContent=val.length+'/28';
-  cc.className='char-count'+(val.length>23?' warn':'');
-  document.getElementById('throw-btn').disabled=!val.trim();
-}
-
-function throwNote() {
-  var input=document.getElementById('note-input');
-  var text=input.value.trim();
-  if(!text) return;
-  var note={id:uid(),text:text,en:null,reactions:{k:0,u:0,e:0},ts:Date.now(),font:Math.floor(Math.random()*3),isNew:true,translating:true,tier:0,permanent:false};
-  notes.unshift(note);
-  input.value=''; onInput();
-  var stats=loadUserStats(); stats.posts++; saveUserStats(stats);
-  updateBadgeIcon();
-  renderCurrent();
-  showToast('이야기를 담는 중이에요...');
-
-  var isKoreanText=/[가-힣]/.test(text);
-  var langPair=isKoreanText?'ko|en':'en|ko';
-  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair='+langPair;
-
-  fetch(url)
-  .then(function(r){return r.json();})
-  .then(function(data){
-    var translated=(data.responseData&&data.responseData.translatedText)?data.responseData.translatedText.trim():'...';
-    // MyMemory가 대문자로 돌려줄 때 소문자로
-    if(!isKoreanText) translated=translated.charAt(0).toLowerCase()+translated.slice(1);
-    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:translated,translating:false,isNew:false}):n; });
-    saveAll(); renderCurrent(); showToast('당신의 이야기가 벽에 새겨졌어요 ✨');
-  })
-  .catch(function(){
-    notes=notes.map(function(n){ return n.id===note.id?Object.assign({},n,{en:'...',translating:false,isNew:false}):n; });
-    saveAll(); renderCurrent(); showToast('당신의 이야기가 벽에 새겨졌어요 ✨');
-  });
-}
-
-// ══════════════════════════════════════════
-// REACT
-// ══════════════════════════════════════════
-function react(noteId, key) {
-  var rkey=noteId+'_'+key;
-  var on=myReacted[rkey];
-  myReacted[rkey]=!on;
-  try { localStorage.setItem('sw_reacted',JSON.stringify(myReacted)); } catch(e) {}
-  notes=notes.map(function(n){
-    if(n.id!==noteId) return n;
-    var r=Object.assign({},n.reactions);
-    r[key]=Math.max(0,r[key]+(on?-1:1));
-    var updated=Object.assign({},n,{reactions:r});
-    updated.tier=calcTier(r);
-    if(updated.tier===2) updated.permanent=true;
-    return updated;
-  });
-  if(!on){ var s=loadUserStats(); s.reactions++; saveUserStats(s); }
-  saveAll(); pruneAndUpgrade(); updateMoonBanner(); renderCurrent();
-  if(!on) showToast(LABELS[key]+' — 당신의 마음이 닿았어요 🌱');
-}
-
-// ══════════════════════════════════════════
-// RENDER
-// ══════════════════════════════════════════
-function noteCard(note) {
-  var op=getOpacity(note);
-  var sc=getSizeClass(note.reactions);
-  var tot=note.reactions.k+note.reactions.u+note.reactions.e;
-  var hot=tot>=8?'<span class="hot">HOT</span>':'';
-  var lock=note.permanent?' 🔒':'';
-  var isKorean=/[가-힣]/.test(note.text);
-  var subHtml;
-  if(note.translating){
-    subHtml=isKorean
-      ?'<div class="translating">영어로 옮기는 중...</div>'
-      :'<div class="translating">한글로 옮기는 중...</div>';
-  } else if(isKorean){
-    // 한글 원문 → 영어 번역을 이탤릭으로
-    subHtml='<div class="note-en">'+(note.en||'')+'</div>';
-  } else {
-    // 영어 원문 → 한글 번역을 낙서체로
-    subHtml='<div class="note-kr-trans">'+(note.en||'')+'</div>';
-  }
-  var btns=['k','u','e'].map(function(k){
-    var on=myReacted[note.id+'_'+k]?'on-'+k:'';
-    return '<button class="react-btn '+on+'" onclick="react(\''+note.id+'\',\''+k+'\')">'+
-      '<span>'+LABELS[k]+'</span><span style="font-size:11px">'+note.reactions[k]+'</span></button>';
-  }).join('');
-  var tierBadge=note.tier>0?'<div class="note-tier-badge">'+BADGE_EMOJIS[note.tier]+'</div>':'';
-  var tierClass=note.tier===2?' tier-fruit':note.tier===1?' tier-leaf':'';
-  return '<div class="note '+sc+(note.isNew?' pop':'')+tierClass+'" data-note-id="'+note.id+'" style="opacity:'+op+'">'+
-    tierBadge+
-    '<div class="note-kr" style="font-family:'+FONTS[note.font]+'">'+note.text+hot+lock+'</div>'+
-    '<div class="divider"></div>'+subHtml+
-    '<div class="note-meta"><span class="note-time">'+timeAgo(note.ts)+'</span>'+
-    '<div class="reactions">'+btns+'</div></div>'+
-    '<div class="life-bar" style="width:'+Math.round(op*100)+'%"></div></div>';
-}
-
-function renderWall(elId, filterFn) {
-  var list=notes.filter(filterFn||function(){return true;}).slice().sort(function(a,b){
-    return (b.reactions.k+b.reactions.u+b.reactions.e)-(a.reactions.k+a.reactions.u+a.reactions.e)||b.ts-a.ts;
-  });
-  var el=document.getElementById(elId);
-  if(!list.length){ el.innerHTML='<div class="empty">아직 아무도 이야기를 꺼내지 않았어요<small>당신의 한 줄이 첫 번째가 될 수 있어요</small></div>'; return; }
-  el.innerHTML=list.map(noteCard).join('');
-}
-
-function renderToday() {
-  var best=notes.slice().sort(function(a,b){
-    return (b.reactions.k+b.reactions.u+b.reactions.e)-(a.reactions.k+a.reactions.u+a.reactions.e);
-  }).slice(0,3);
-  var medals=['🥇','🥈','🥉'];
-  document.getElementById('view-today').innerHTML=
-    '<div class="today-label">TODAY\'S MOST LOVED · 오늘 가장 많은 반응</div>'+
-    best.map(function(n,i){
-      var t=n.reactions.k+n.reactions.u+n.reactions.e;
-      return '<div class="best-card"><div class="best-rank">'+medals[i]+' #'+(i+1)+'</div>'+
-        '<div class="best-kr" style="font-family:'+FONTS[n.font]+'">'+n.text+'</div>'+
-        '<div class="best-en">'+(n.en||'...')+'</div>'+
-        '<div class="best-stats">ㅋ '+n.reactions.k+' · ㅠ '+n.reactions.u+' · ! '+n.reactions.e+' · 총 '+t+'</div></div>';
-    }).join('');
-}
-
-// ── BADGE SVGs ──
-function seedSVG(e){ var o=e?1:0.3; return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+o+'"><circle cx="30" cy="30" r="28" fill="#0e1e0e" stroke="#90EE90" stroke-width="1.5"/><ellipse cx="30" cy="36" rx="8" ry="10" fill="#2d5a2d"/><path d="M30 26 Q38 18 44 22 Q40 32 30 30 Q20 32 16 22 Q22 18 30 26Z" fill="#90EE90"/><line x1="30" y1="30" x2="30" y2="44" stroke="#5a9a5a" stroke-width="1.5"/><circle cx="30" cy="25" r="3" fill="#c8f060" opacity="0.8"/></svg>'; }
-function leafSVG(e){ var o=e?1:0.3; return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+o+'"><circle cx="30" cy="30" r="28" fill="#0a1a0a" stroke="#32CD32" stroke-width="1.5"/><path d="M30 44 Q14 32 18 18 Q26 12 38 16 Q46 28 30 44Z" fill="#228B22"/><path d="M30 44 Q32 34 36 26" stroke="#90EE90" stroke-width="1.2" fill="none"/><path d="M26 30 Q28 28 32 26" stroke="#90EE90" stroke-width="0.8" fill="none"/><path d="M24 36 Q26 33 30 32" stroke="#90EE90" stroke-width="0.8" fill="none"/><circle cx="38" cy="16" r="2.5" fill="#c8f060" opacity="0.9"/></svg>'; }
-function fruitSVG(e){ var o=e?1:0.3; return '<svg class="badge-svg" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style="opacity:'+o+'"><defs><radialGradient id="ag" cx="40%" cy="35%"><stop offset="0%" stop-color="#ff6644"/><stop offset="100%" stop-color="#cc1100"/></radialGradient></defs><circle cx="30" cy="30" r="28" fill="#1a0e00" stroke="#FF8C00" stroke-width="1.5"/><ellipse cx="30" cy="35" rx="14" ry="14" fill="url(#ag)"/><path d="M30 21 Q32 14 38 13" stroke="#228B22" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M30 21 Q34 17 36 19" fill="#228B22"/><ellipse cx="24" cy="30" rx="3" ry="5" fill="rgba(255,255,255,0.15)" transform="rotate(-20,24,30)"/><circle cx="44" cy="14" r="2" fill="#FFD700" opacity="0.8"/></svg>'; }
-
-function renderBadge() {
-  var stats=loadUserStats(), myBadge=getUserBadge();
-  var bdata=[
-    {key:'seed',label:'씨앗',color:'seed',desc:'삶의 이야기를 처음 꺼낸 용기 있는 사람',req:'낙서 1개 이상',earned:myBadge>=0,svg:seedSVG},
-    {key:'leaf',label:'잎사귀',color:'leaf',desc:'삶을 꾸준히 기록하며 나누는 사람',req:'낙서 3개 + 반응 5개',earned:myBadge>=1,svg:leafSVG},
-    {key:'fruit',label:'열매',color:'fruit',desc:'당신의 한 줄이 많은 이의 마음에 닿았어요',req:'낙서 10개 + 반응 30개',earned:myBadge>=2,svg:fruitSVG},
-  ];
-  var badgeCards=bdata.map(function(d){
-    return '<div class="badge-card '+(d.earned?'earned ':'')+d.color+'">'+
-      d.svg(d.earned)+
-      '<div class="badge-name '+d.color+'">'+BADGE_EMOJIS[bdata.indexOf(d)]+' '+d.label+'</div>'+
-      '<div class="badge-desc">'+d.desc+'</div>'+
-      '<div class="badge-req">들어오려면: '+d.req+'</div>'+
-      (!d.earned?'<div class="badge-locked">🔒</div>':'')+
-      '</div>';
-  }).join('');
-  var tierInfo=[
-    {emoji:'🌱',name:'씨앗벽',desc:'반응 합계 0~5',req:'씨앗 뱃지 필요',min:0,tab:'seed'},
-    {emoji:'🍃',name:'잎사귀벽',desc:'반응 합계 6~14',req:'잎사귀 뱃지 필요',min:1,tab:'leaf'},
-    {emoji:'🍎',name:'열매벽',desc:'반응 15+, 영구저장',req:'열매 뱃지 필요',min:2,tab:'fruit'},
-  ];
-  var tierCards=tierInfo.map(function(t){
-    var ok=myBadge>=t.min;
-    return '<div class="badge-card" style="cursor:pointer" onclick="'+(ok?'switchTab(\''+t.tab+'\')':'showToast(\''+t.req+' 🔒\')')+'">'+
-      '<div style="font-size:32px;margin-bottom:8px">'+t.emoji+'</div>'+
-      '<div class="badge-name '+BADGE_COLORS[t.min]+'">'+t.name+'</div>'+
-      '<div class="badge-desc">'+t.desc+'</div>'+
-      '<div class="badge-req">'+t.req+'</div>'+
-      (ok?'<div style="font-size:10px;color:#90EE90;margin-top:6px">✓ 들어갈 수 있어요</div>':'<div class="badge-locked">🔒</div>')+
-      '</div>';
-  }).join('');
-  document.getElementById('view-badge').innerHTML=
-    '<div class="my-stats">'+
-    '<div class="my-stats-title">나의 이야기 기록</div>'+
-    '<div class="stat-row"><span class="stat-label">🏅 나의 등급</span><span class="stat-value">'+(myBadge>=0?BADGE_EMOJIS[myBadge]+' '+BADGE_NAMES[myBadge]:'아직 이야기를 꺼내지 않으셨어요')+'</span></div>'+
-    '<div class="stat-row"><span class="stat-label">✍️ 남긴 이야기</span><span class="stat-value">'+stats.posts+'개</span></div>'+
-    '<div class="stat-row"><span class="stat-label">❤️ 마음을 건넨 횟수</span><span class="stat-value">'+stats.reactions+'개</span></div>'+
-    '</div>'+
-    '<div class="badge-section"><div class="badge-section-title">이야기꾼의 등급</div><div class="badge-cards">'+badgeCards+'</div></div>'+
-    '<div class="badge-section"><div class="badge-section-title">이야기의 깊이에 따라 나뉘는 공간</div><div class="badge-cards">'+tierCards+'</div></div>';
-}
-
-function checkTierAccess(tab) {
-  var myBadge=getUserBadge();
-  var req={seed:0,leaf:1,fruit:2};
-  if(myBadge<req[tab]){
-    document.getElementById('view-'+tab).innerHTML=
-      '<div class="tier-gate"><div class="tier-gate-icon">'+BADGE_EMOJIS[req[tab]]+'</div>'+
-      '<div class="tier-gate-title">'+BADGE_NAMES[req[tab]]+' 뱃지 필요</div>'+
-      '<div class="tier-gate-desc">이 공간은 '+BADGE_NAMES[req[tab]]+' 이야기를 나눠온 분만 들어올 수 있어요.<br><br>뱃지 탭에서 조건을 확인하고 당신의 이야기를 계속 나눠주세요 🌱</div></div>';
-    return false;
-  }
-  return true;
-}
-
-// ══════════════════════════════════════════
-// SWITCH TAB
-// ══════════════════════════════════════════
-var ALL_TABS=['wall','today','seed','leaf','fruit','badge'];
-function switchTab(tab) {
-  currentTab=tab;
-  ALL_TABS.forEach(function(t){
-    var el=document.getElementById('tab-'+t);
-    if(el){ var c=el.className.replace(' active',''); el.className=c+(t===tab?' active':''); }
-    var vel=document.getElementById('view-'+t);
-    if(vel) vel.style.display='none';
-    var fn=document.getElementById('fnav-'+t);
-    if(fn) fn.className='footer-nav-btn'+(t===tab?' active':'');
-  });
-  var isBlock=tab==='today'||tab==='badge';
-  document.getElementById('view-'+tab).style.display=isBlock?'block':'flex';
-  document.getElementById('input-area').style.display=(tab==='badge'||tab==='today')?'none':'block';
-
-  if(tab==='wall')       renderWall('view-wall');
-  else if(tab==='today') renderToday();
-  else if(tab==='badge') renderBadge();
-  else if(tab==='seed')  { if(checkTierAccess('seed'))  renderWall('view-seed',  function(n){return calcTier(n.reactions)===0;}); }
-  else if(tab==='leaf')  { if(checkTierAccess('leaf'))  renderWall('view-leaf',  function(n){return calcTier(n.reactions)===1;}); }
-  else if(tab==='fruit') { if(checkTierAccess('fruit')) renderWall('view-fruit', function(n){return calcTier(n.reactions)===2;}); }
-}
-function renderCurrent(){ switchTab(currentTab); }
-
-// ══════════════════════════════════════════
-// PI AUTH
-// ══════════════════════════════════════════
-var PiService=(function(){
-  var _user=null;
-  function login(){
-    Pi.init({version:'2.0',sandbox:false});
-    return Pi.authenticate(['username'],function(p){console.warn('Incomplete:',p);})
-      .then(function(auth){ _user=auth.user; return {success:true,user:auth.user}; })
-      .catch(function(e){ return {success:false,error:e}; });
-  }
-  return {login:login};
-})();
-
-// ══════════════════════════════════════════
-// START
-// ══════════════════════════════════════════
-updateBadgeIcon();
-initDB();
-
-PiService.login().then(function(r){
-  if(r.success){
-    currentUser=r.user;
-    document.getElementById('user-dot').classList.add('online');
-    document.getElementById('user-label').textContent='@'+r.user.username+' · 오늘의 이야기를 기다리고 있어요';
-    document.getElementById('throw-btn').disabled=false;
-    document.getElementById('input-hint').textContent='@'+r.user.username+' (익명으로 안전하게 남겨져요)';
-  } else {
-    document.getElementById('user-label').textContent='Pi 계정으로 로그인하면 이야기를 남길 수 있어요';
-    document.getElementById('throw-btn').disabled=false;
-  }
+// 이벤트
+let qTimer;
+$('q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { query = e.target.value.trim(); shown = PAGE; render(); }, 200); });
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  filter = c.dataset.f; shown = PAGE;
+  document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === c)));
+  render();
+}));
+$('more').addEventListener('click', () => { shown += PAGE; render(); });
+$('jump').addEventListener('change', e => { if(e.target.value){ history.replaceState(null, '', '#' + e.target.value); goTo(e.target.value); e.target.value = ''; } });
+$('list').addEventListener('click', async e => {
+  const b = e.target.closest('.day-link'); if(!b) return;
+  const url = location.href.split('#')[0] + '#' + b.dataset.date;
+  toast(await copy(url) ? '이 날 유이 링크를 복사했어요' : '복사하지 못했어요');
 });
+window.addEventListener('hashchange', () => goTo(location.hash.slice(1)));
 
-setInterval(function(){
-  pruneAndUpgrade();
-  updateMoonBanner();
-  renderCurrent();
-}, 60000);
+// 불러오기
+(async function(){
+  try{
+    const r = await fetch(SOURCE + '?_=' + Date.now(), { cache: 'no-store' });
+    if(!r.ok) throw new Error(r.status);
+    DAYS = parse(await r.text());
+  }catch(e){ $('status').textContent = '유이를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.'; return; }
+  $('jump').innerHTML = '<option value="">날짜로 가기</option>' + DAYS.map(d => { const L = dateLabel(d.date); return `<option value="${d.date}">${L.main} (${L.wd.slice(0, 1)})</option>`; }).join('');
+  render();
+  if(/^#\d{4}-\d{2}-\d{2}$/.test(location.hash)) goTo(location.hash.slice(1));
+})();
 </script>
 </body>
 </html>
